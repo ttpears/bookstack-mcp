@@ -791,10 +791,23 @@ export class BookStackTools {
 
         case "export_page":
           const exportedContent = await this.client.exportPage(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
+          
+          // Validate that we have content
+          if (!exportedContent) {
+            throw new Error(`Export returned empty content for page ${args.id} in ${args.format} format`);
+          }
+          
+          const contentText = typeof exportedContent === 'string' ? exportedContent : JSON.stringify(exportedContent, null, 2);
+          
+          // Additional validation for content
+          if (!contentText || contentText.trim().length === 0) {
+            throw new Error(`Export produced empty content for page ${args.id} in ${args.format} format`);
+          }
+          
           return {
             content: [{
               type: "text",
-              text: typeof exportedContent === 'string' ? exportedContent : JSON.stringify(exportedContent, null, 2)
+              text: contentText
             }]
           };
 
@@ -947,14 +960,20 @@ export class BookStackTools {
             }]
           };
 
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
     } catch (error) {
+      console.error('BookStack tool error:', error);
+      
+      // Ensure we always return a valid response structure
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
       return {
         content: [{
           type: "text",
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          text: `BookStack Error: ${errorMessage}\n\nTool: ${name}\nArguments: ${JSON.stringify(args, null, 2)}`
         }],
         isError: true
       };

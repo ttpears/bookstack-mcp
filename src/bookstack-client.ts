@@ -391,30 +391,51 @@ export class BookStackClient {
   }
 
   async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
-    const config: any = {};
-    
-    // For binary formats (PDF, ZIP), we need to handle them differently
-    if (format === 'pdf' || format === 'zip') {
-      config.responseType = 'arraybuffer';
+    try {
+      const config: any = {};
+      
+      // For binary formats (PDF, ZIP), we need to handle them differently
+      if (format === 'pdf' || format === 'zip') {
+        config.responseType = 'arraybuffer';
+      }
+      
+      console.error(`Exporting page ${id} as ${format}...`);
+      const response = await this.client.get(`/pages/${id}/export/${format}`, config);
+      console.error(`Export response status: ${response.status}`);
+      
+      // For binary formats, return base64 encoded data with metadata
+      if (format === 'pdf' || format === 'zip') {
+        if (!response.data || response.data.byteLength === 0) {
+          throw new Error(`Empty ${format} file returned from BookStack API`);
+        }
+        
+        const buffer = Buffer.from(response.data);
+        console.error(`PDF/ZIP buffer size: ${buffer.length} bytes`);
+        
+        return {
+          format: format,
+          filename: `page-${id}.${format}`,
+          size_bytes: buffer.length,
+          content_base64: buffer.toString('base64'),
+          download_note: 'Binary content encoded as base64. Save and decode to access the file.',
+          content_type: format === 'pdf' ? 'application/pdf' : 'application/zip',
+          export_success: true,
+          page_id: id
+        };
+      }
+      
+      // For text formats, validate and return as string
+      if (!response.data) {
+        throw new Error(`Empty ${format} content returned from BookStack API`);
+      }
+      
+      console.error(`Text export length: ${response.data.length} characters`);
+      return response.data;
+      
+    } catch (error) {
+      console.error(`Export error for page ${id}:`, error);
+      throw new Error(`Failed to export page ${id} as ${format}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    const response = await this.client.get(`/pages/${id}/export/${format}`, config);
-    
-    // For binary formats, return base64 encoded data with metadata
-    if (format === 'pdf' || format === 'zip') {
-      const buffer = Buffer.from(response.data);
-      return {
-        format: format,
-        filename: `page-${id}.${format}`,
-        size_bytes: buffer.length,
-        content_base64: buffer.toString('base64'),
-        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
-        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
-      };
-    }
-    
-    // For text formats, return as string
-    return response.data;
   }
 
   async exportBook(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
