@@ -33,7 +33,7 @@ This server supports two deployment methods:
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/ttpears/bookstack-mcp.git
 cd bookstack-mcp
 
 # Copy environment configuration
@@ -41,14 +41,14 @@ cp .env.example .env
 # Edit .env with your BookStack configuration
 
 # Build and run with Docker Compose
-docker-compose up -d
+docker compose up -d
 ```
 
 #### Manual Installation
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/ttpears/bookstack-mcp.git
 cd bookstack-mcp
 
 # Install dependencies
@@ -65,7 +65,7 @@ To integrate with LibreChat, follow these specific steps:
 ```bash
 # 1. Clone this repository into your LibreChat directory
 cd /path/to/your/librechat
-git clone <your-repo-url> bookstack-mcp
+git clone https://github.com/ttpears/bookstack-mcp.git bookstack-mcp
 
 # 2. Add environment variables to your LibreChat .env file
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
@@ -79,7 +79,7 @@ echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
 # Copy the content from librechat.yaml.example
 
 # 5. Restart LibreChat
-docker-compose down && docker-compose up -d
+docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
 ## Configuration
@@ -178,12 +178,12 @@ Once integrated with LibreChat:
 
 1. Start LibreChat with the new service:
    ```bash
-   docker-compose down && docker-compose up -d
+   docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
    ```
 
 2. Verify the BookStack MCP service is running:
    ```bash
-   docker-compose ps bookstack-mcp
+   docker compose ps bookstack-mcp
    ```
 
 3. Check service health:
@@ -207,30 +207,30 @@ docker run -d \
   bookstack-mcp
 
 # Using Docker Compose (recommended)
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f bookstack-mcp
+docker compose logs -f bookstack-mcp
 
 # Stop the service
-docker-compose down
+docker compose down
 ```
 
 #### LibreChat Integration Commands
 
 ```bash
 # Build and start LibreChat with BookStack MCP
-docker-compose up -d
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 # View BookStack MCP logs
-docker-compose logs -f bookstack-mcp
+docker compose logs -f bookstack-mcp
 
 # Rebuild BookStack MCP service
-docker-compose build bookstack-mcp
-docker-compose up -d bookstack-mcp
+docker compose build bookstack-mcp
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d bookstack-mcp
 
 # Stop all services
-docker-compose down
+docker compose down
 ```
 
 ## API Endpoints
@@ -350,10 +350,10 @@ npm run type-check
 1. **Service Not Starting:**
    ```bash
    # Check if service is defined properly
-   docker-compose config bookstack-mcp
+   docker compose config bookstack-mcp
    
    # Check service logs
-   docker-compose logs bookstack-mcp
+   docker compose logs bookstack-mcp
    ```
 
 2. **MCP Connection Issues:**
@@ -364,13 +364,13 @@ npm run type-check
 3. **Environment Variable Issues:**
    ```bash
    # Verify environment variables are loaded
-   docker-compose exec bookstack-mcp env | grep BOOKSTACK
+   docker compose exec bookstack-mcp env | grep BOOKSTACK
    ```
 
 4. **Network Issues:**
    ```bash
    # Test internal connectivity from LibreChat container
-   docker-compose exec api curl http://bookstack-mcp:8007/health
+   docker compose exec api curl http://bookstack-mcp:8007/health
    ```
 
 ## Contributing

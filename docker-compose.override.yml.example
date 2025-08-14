@@ -1,4 +1,5 @@
 # LibreChat Integration - Add this to your LibreChat docker-compose.override.yml
+# Then restart with: docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 services:
   bookstack-mcp:

@@ -6,7 +6,9 @@
       "WebFetch(domain:demo.bookstackapp.com)",
       "Bash(mkdir:*)",
       "Bash(npm run build:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": [],

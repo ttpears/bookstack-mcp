@@ -17,7 +17,7 @@ This guide provides step-by-step instructions for integrating the BookStack MCP 
 cd /path/to/your/librechat
 
 # Clone the BookStack MCP repository
-git clone <your-repo-url> bookstack-mcp
+git clone https://github.com/ttpears/bookstack-mcp.git bookstack-mcp
 ```
 
 ### Step 2: Environment Configuration
@@ -78,10 +78,10 @@ Restart LibreChat with the new configuration:
 
 ```bash
 # Stop LibreChat
-docker-compose down
+docker compose down
 
 # Start LibreChat with the new service
-docker-compose up -d
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
 ## Verification
@@ -90,10 +90,10 @@ docker-compose up -d
 
 ```bash
 # Verify all services are running
-docker-compose ps
+docker compose ps
 
 # Check BookStack MCP logs
-docker-compose logs -f bookstack-mcp
+docker compose logs -f bookstack-mcp
 
 # Test health endpoint
 curl http://localhost:8007/health
@@ -132,27 +132,27 @@ librechat/
 
 ```bash
 # Check Docker Compose configuration
-docker-compose config
+docker compose config
 
 # Check for environment variable issues
-docker-compose exec bookstack-mcp env | grep BOOKSTACK
+docker compose exec bookstack-mcp env | grep BOOKSTACK
 ```
 
 ### MCP Connection Issues
 
 ```bash
 # Test internal network connectivity
-docker-compose exec api curl http://bookstack-mcp:8007/health
+docker compose exec api curl http://bookstack-mcp:8007/health
 
 # Check LibreChat logs for MCP errors
-docker-compose logs api | grep -i mcp
+docker compose logs api | grep -i mcp
 ```
 
 ### BookStack API Issues
 
 ```bash
 # Test BookStack API access from container
-docker-compose exec bookstack-mcp curl -H "Authorization: Token ${BOOKSTACK_TOKEN_ID}:${BOOKSTACK_TOKEN_SECRET}" ${BOOKSTACK_BASE_URL}/api/docs
+docker compose exec bookstack-mcp curl -H "Authorization: Token ${BOOKSTACK_TOKEN_ID}:${BOOKSTACK_TOKEN_SECRET}" ${BOOKSTACK_BASE_URL}/api/docs
 ```
 
 ## Maintenance
@@ -167,15 +167,15 @@ cd bookstack-mcp
 git pull origin main
 
 # Rebuild and restart the service
-docker-compose build bookstack-mcp
-docker-compose up -d bookstack-mcp
+docker compose build bookstack-mcp
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d bookstack-mcp
 ```
 
 ### Monitoring
 
 - Check service health regularly: `curl http://localhost:8007/health`
-- Monitor logs: `docker-compose logs -f bookstack-mcp`
-- Verify LibreChat can reach the service: `docker-compose exec api curl http://bookstack-mcp:8007/health`
+- Monitor logs: `docker compose logs -f bookstack-mcp`
+- Verify LibreChat can reach the service: `docker compose exec api curl http://bookstack-mcp:8007/health`
 
 ## Security Considerations
 

@@ -38,7 +38,7 @@ Example LibreChat Configuration:
       url: http://localhost:8007/sse
       timeout: 60000
 
-For more information, visit: https://github.com/your-repo/bookstack-mcp
+For more information, visit: https://github.com/ttpears/bookstack-mcp
   `);
 }
 
