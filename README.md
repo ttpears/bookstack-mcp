@@ -70,27 +70,25 @@ cp .env.example .env
 
 ### Option 2: LibreChat Integration
 
-To integrate with LibreChat, follow these specific steps:
+To integrate with LibreChat, follow these steps (no cloning required):
 
 ```bash
-# 1. Clone this repository into your LibreChat directory
-cd /path/to/your/librechat
-git clone https://github.com/ttpears/bookstack-mcp.git bookstack-mcp
-
-# 2. Add environment variables to your LibreChat .env file
+# 1. Add environment variables to your LibreChat .env file
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
 echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
 echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
 
-# 3. Add the service to your docker-compose.override.yml
+# 2. Add the service to your docker-compose.override.yml
 # Copy the content from docker-compose.override.yml.example
 
-# 4. Add MCP configuration to your librechat.yaml
+# 3. Add MCP configuration to your librechat.yaml
 # Copy the content from librechat.yaml.example
 
-# 5. Restart LibreChat
+# 4. Restart LibreChat
 docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
+
+**Important:** The LibreChat integration is completely self-contained. The `Dockerfile.mcp-bookstack` automatically clones the repository, builds the project, and configures supergateway. You don't need to clone anything locally.
 
 ## Configuration
 
@@ -149,7 +147,7 @@ Add this service to your LibreChat `docker-compose.override.yml`:
 services:
   bookstack-mcp:
     build:
-      context: ./bookstack-mcp
+      context: https://github.com/ttpears/bookstack-mcp.git
       dockerfile: Dockerfile.mcp-bookstack
     environment:
       - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}

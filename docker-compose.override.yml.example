@@ -1,10 +1,13 @@
 # LibreChat Integration - Add this to your LibreChat docker-compose.override.yml
 # Then restart with: docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+#
+# Note: This uses a git context - no need to clone the repository locally!
+# The Dockerfile.mcp-bookstack automatically clones, builds, and configures everything.
 
 services:
   bookstack-mcp:
     build:
-      context: ./bookstack-mcp
+      context: https://github.com/ttpears/bookstack-mcp.git
       dockerfile: Dockerfile.mcp-bookstack
     environment:
       - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
