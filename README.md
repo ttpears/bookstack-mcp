@@ -334,6 +334,12 @@ Once configured, you can use BookStack tools in LibreChat conversations:
 
 **Note:** Write operations require `BOOKSTACK_ENABLE_WRITE=true` in your environment variables.
 
+**Production Usage:**
+- The AI can ask "What are my BookStack capabilities?" to see available tools
+- Write operations are disabled by default for security
+- All read operations work without any special configuration
+- Use the `get_capabilities` tool to understand current limitations
+
 ### Direct API Testing (Standalone)
 
 ```bash

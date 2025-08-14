@@ -26,9 +26,13 @@ async function main() {
 
     console.error('Initializing BookStack MCP Server (stdio)...');
     console.error(`BookStack URL: ${config.baseUrl}`);
+    console.error(`Write operations: ${config.enableWrite ? 'ENABLED' : 'DISABLED'}`);
+    if (!config.enableWrite) {
+      console.error('ℹ️  Only read operations available. Set BOOKSTACK_ENABLE_WRITE=true to enable writes.');
+    }
 
     const client = new BookStackClient(config);
-    const tools = new BookStackTools(client);
+    const tools = new BookStackTools(client, config.enableWrite);
 
     const server = new Server(
       {

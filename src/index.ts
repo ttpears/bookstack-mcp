@@ -59,9 +59,13 @@ async function main() {
 
     console.log('Initializing BookStack MCP Server...');
     console.log(`BookStack URL: ${config.baseUrl}`);
+    console.log(`Write operations: ${config.enableWrite ? 'ENABLED' : 'DISABLED'}`);
+    if (!config.enableWrite) {
+      console.log('ℹ️  Only read operations available. Set BOOKSTACK_ENABLE_WRITE=true to enable writes.');
+    }
 
     const client = new BookStackClient(config);
-    const tools = new BookStackTools(client);
+    const tools = new BookStackTools(client, config.enableWrite);
     const sseServer = new SSETransportServer(tools);
 
     const port = parseInt(process.env.PORT || '8007');

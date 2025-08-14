@@ -6,10 +6,19 @@ import {
 import { BookStackClient } from "./bookstack-client.js";
 
 export class BookStackTools {
-  constructor(private client: BookStackClient) {}
+  constructor(private client: BookStackClient, private enableWrite: boolean = false) {}
 
   getTools(): Tool[] {
-    return [
+    const readOnlyTools: Tool[] = [
+      {
+        name: "get_capabilities",
+        description: "Get information about available BookStack MCP capabilities and current configuration",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          additionalProperties: false
+        }
+      },
       {
         name: "search_content",
         description: "Search across BookStack content with advanced filtering",
@@ -195,6 +204,28 @@ export class BookStackTools {
         }
       },
       {
+        name: "export_page",
+        description: "Export a page in various formats",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Page ID"
+            },
+            format: {
+              type: "string",
+              enum: ["html", "pdf", "markdown", "plaintext"],
+              description: "Export format"
+            }
+          },
+          required: ["id", "format"]
+        }
+      }
+    ];
+
+    const writeTools: Tool[] = [
+      {
         name: "create_page",
         description: "Create a new page in BookStack",
         inputSchema: {
@@ -249,27 +280,11 @@ export class BookStackTools {
           },
           required: ["id"]
         }
-      },
-      {
-        name: "export_page",
-        description: "Export a page in various formats",
-        inputSchema: {
-          type: "object",
-          properties: {
-            id: {
-              type: "number",
-              description: "Page ID"
-            },
-            format: {
-              type: "string",
-              enum: ["html", "pdf", "markdown", "plaintext"],
-              description: "Export format"
-            }
-          },
-          required: ["id", "format"]
-        }
       }
     ];
+
+    // Only include write tools if explicitly enabled
+    return this.enableWrite ? [...readOnlyTools, ...writeTools] : readOnlyTools;
   }
 
   async handleToolCall(request: CallToolRequest): Promise<any> {
@@ -281,6 +296,50 @@ export class BookStackTools {
 
     try {
       switch (name) {
+        case "get_capabilities":
+          const capabilities = {
+            server_name: "BookStack MCP Server",
+            version: "1.0.0",
+            write_operations_enabled: this.enableWrite,
+            available_tools: {
+              read_operations: [
+                "get_capabilities - Show this capability information",
+                "search_content - Advanced search with filtering and BookStack syntax",
+                "search_pages - Search specifically for pages with book filtering",
+                "get_books - List books with filtering, sorting, and pagination",
+                "get_book - Get detailed information about a specific book", 
+                "get_pages - List pages with advanced filtering options",
+                "get_page - Get full content of a specific page",
+                "get_chapters - List chapters with filtering options",
+                "get_chapter - Get details of a specific chapter",
+                "export_page - Export pages in multiple formats (HTML, PDF, Markdown, Plain text)"
+              ],
+              write_operations: this.enableWrite ? [
+                "create_page - Create new pages in BookStack",
+                "update_page - Update existing pages"
+              ] : [
+                "❌ DISABLED - Write operations are currently disabled",
+                "ℹ️  To enable: Set BOOKSTACK_ENABLE_WRITE=true in environment variables"
+              ]
+            },
+            advanced_features: [
+              "BookStack advanced search syntax: {type:page}, {book_id:5}, {created_by:me}",
+              "Pagination support up to 500 results per request", 
+              "Multi-criteria filtering and custom sorting",
+              "Export capabilities in multiple formats"
+            ],
+            security_note: this.enableWrite 
+              ? "⚠️  Write operations are ENABLED - AI can create and modify BookStack content"
+              : "🛡️  Read-only mode - Safe for production use"
+          };
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(capabilities, null, 2)
+            }]
+          };
+
         case "search_content":
           const searchResults = await this.client.searchContent(args.query as string, {
             type: args.type as any,
