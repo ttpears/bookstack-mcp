@@ -5,9 +5,10 @@ A Model Context Protocol (MCP) server for BookStack with Server-Sent Events (SSE
 ## Features
 
 - **Full BookStack API Integration**: Search, read, create, and update content
+- **Embedded URLs**: All responses include clickable links to BookStack pages for immediate access
 - **Dual Transport Support**: Both SSE and stdio transports available
 - **LibreChat Compatible**: Self-contained Docker integration with supergateway
-- **Comprehensive Tools**: 10 different tools for BookStack operations
+- **Comprehensive Tools**: 11 different tools for BookStack operations
 - **Authentication**: Secure API token-based authentication
 - **TypeScript**: Full type safety and modern development experience
 
@@ -23,21 +24,24 @@ The LibreChat integration uses the stdio version with supergateway to bridge to 
 ## Available Tools
 
 ### Read Operations (Always Available)
-1. **search_content** - Advanced search with filtering, pagination, and BookStack search syntax
-2. **search_pages** - Search specifically for pages with optional book filtering  
-3. **get_books** - List books with advanced filtering, sorting, and pagination
-4. **get_book** - Get detailed information about a specific book
-5. **get_pages** - List pages with filtering by book, chapter, custom criteria, and sorting
-6. **get_page** - Get full content of a specific page
-7. **get_chapters** - List chapters with advanced filtering options
-8. **get_chapter** - Get details of a specific chapter
-9. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text)
+1. **get_capabilities** - Show current server capabilities and available tools
+2. **search_content** - Advanced search with filtering, pagination, and BookStack search syntax
+3. **search_pages** - Search specifically for pages with optional book filtering  
+4. **get_books** - List books with advanced filtering, sorting, and pagination
+5. **get_book** - Get detailed information about a specific book
+6. **get_pages** - List pages with filtering by book, chapter, custom criteria, and sorting
+7. **get_page** - Get full content of a specific page
+8. **get_chapters** - List chapters with advanced filtering options
+9. **get_chapter** - Get details of a specific chapter
+10. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text)
 
 ### Write Operations (Requires BOOKSTACK_ENABLE_WRITE=true)
-10. **create_page** - Create new pages in BookStack
-11. **update_page** - Update existing pages
+11. **create_page** - Create new pages in BookStack
+12. **update_page** - Update existing pages
 
 **Security Note:** Write operations are disabled by default. Set `BOOKSTACK_ENABLE_WRITE=true` to enable page creation and updates.
+
+**URL Integration:** All responses include embedded URLs and direct links to BookStack content, making it easy to navigate from AI responses directly to the relevant pages for review or editing.
 
 ## Installation
 
@@ -336,6 +340,7 @@ Once configured, you can use BookStack tools in LibreChat conversations:
 
 **Production Usage:**
 - The AI can ask "What are my BookStack capabilities?" to see available tools
+- All responses include clickable BookStack URLs for immediate access to content
 - Write operations are disabled by default for security
 - All read operations work without any special configuration
 - Use the `get_capabilities` tool to understand current limitations

@@ -63,9 +63,11 @@ export interface ListResponse<T> {
 export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
+  private baseUrl: string;
 
   constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
+    this.baseUrl = config.baseUrl;
     this.client = axios.create({
       baseURL: `${config.baseUrl}/api`,
       headers: {
@@ -75,11 +77,81 @@ export class BookStackClient {
     });
   }
 
+  // URL generation utilities
+  private generateBookUrl(book: Book): string {
+    return `${this.baseUrl}/books/${book.slug || book.id}`;
+  }
+
+  private generatePageUrl(page: Page): string {
+    return `${this.baseUrl}/books/${page.book_id}/page/${page.slug || page.id}`;
+  }
+
+  private generateChapterUrl(chapter: Chapter): string {
+    return `${this.baseUrl}/books/${chapter.book_id}/chapter/${chapter.slug || chapter.id}`;
+  }
+
+  private generateSearchUrl(query: string): string {
+    const encodedQuery = encodeURIComponent(query);
+    return `${this.baseUrl}/search?term=${encodedQuery}`;
+  }
+
+  // Enhanced response helpers
+  private enhanceBookResponse(book: Book): any {
+    return {
+      ...book,
+      url: this.generateBookUrl(book),
+      direct_link: `[${book.name}](${this.generateBookUrl(book)})`
+    };
+  }
+
+  private enhancePageResponse(page: Page): any {
+    return {
+      ...page,
+      url: this.generatePageUrl(page),
+      direct_link: `[${page.name}](${this.generatePageUrl(page)})`
+    };
+  }
+
+  private enhanceChapterResponse(chapter: Chapter): any {
+    return {
+      ...chapter,
+      url: this.generateChapterUrl(chapter),
+      direct_link: `[${chapter.name}](${this.generateChapterUrl(chapter)})`
+    };
+  }
+
+  private enhanceSearchResults(results: SearchResult[], originalQuery: string): any {
+    return {
+      search_query: originalQuery,
+      search_url: this.generateSearchUrl(originalQuery),
+      results: results.map(result => ({
+        ...result,
+        url: this.generateContentUrl(result),
+        direct_link: `[${result.name}](${this.generateContentUrl(result)})`
+      }))
+    };
+  }
+
+  private generateContentUrl(result: SearchResult): string {
+    switch (result.type) {
+      case 'page':
+        return `${this.baseUrl}/books/${result.book_id}/page/${result.slug || result.id}`;
+      case 'chapter':
+        return `${this.baseUrl}/books/${result.book_id}/chapter/${result.slug || result.id}`;
+      case 'book':
+        return `${this.baseUrl}/books/${result.slug || result.id}`;
+      case 'bookshelf':
+        return `${this.baseUrl}/shelves/${result.slug || result.id}`;
+      default:
+        return `${this.baseUrl}/link/${result.id}`;
+    }
+  }
+
   async searchContent(query: string, options?: {
     type?: 'book' | 'page' | 'chapter' | 'bookshelf';
     count?: number;
     offset?: number;
-  }): Promise<SearchResult[]> {
+  }): Promise<any> {
     let searchQuery = query;
     
     // Use advanced search syntax for type filtering
@@ -92,14 +164,16 @@ export class BookStackClient {
     if (options?.offset) params.offset = options.offset;
     
     const response = await this.client.get('/search', { params });
-    return response.data.data || response.data;
+    const results = response.data.data || response.data;
+    
+    return this.enhanceSearchResults(results, query);
   }
 
   async searchPages(query: string, options?: {
     bookId?: number;
     count?: number;
     offset?: number;
-  }): Promise<SearchResult[]> {
+  }): Promise<any> {
     let searchQuery = `{type:page} ${query}`.trim();
     
     // Add book filtering if specified
@@ -112,7 +186,9 @@ export class BookStackClient {
     if (options?.offset) params.offset = options.offset;
     
     const response = await this.client.get('/search', { params });
-    return response.data.data || response.data;
+    const results = response.data.data || response.data;
+    
+    return this.enhanceSearchResults(results, query);
   }
 
   async getBooks(options?: {
@@ -130,12 +206,17 @@ export class BookStackClient {
     if (options?.filter) params.filter = JSON.stringify(options.filter);
     
     const response = await this.client.get('/books', { params });
-    return response.data;
+    const data = response.data;
+    
+    return {
+      ...data,
+      data: data.data.map((book: Book) => this.enhanceBookResponse(book))
+    };
   }
 
-  async getBook(id: number): Promise<Book> {
+  async getBook(id: number): Promise<any> {
     const response = await this.client.get(`/books/${id}`);
-    return response.data;
+    return this.enhanceBookResponse(response.data);
   }
 
   async getPages(options?: {
@@ -163,25 +244,35 @@ export class BookStackClient {
     if (options?.sort) params.sort = options.sort;
     
     const response = await this.client.get('/pages', { params });
-    return response.data;
+    const data = response.data;
+    
+    return {
+      ...data,
+      data: data.data.map((page: Page) => this.enhancePageResponse(page))
+    };
   }
 
-  async getPage(id: number): Promise<Page> {
+  async getPage(id: number): Promise<any> {
     const response = await this.client.get(`/pages/${id}`);
-    return response.data;
+    return this.enhancePageResponse(response.data);
   }
 
-  async getChapters(bookId?: number, offset = 0, count = 50): Promise<ListResponse<Chapter>> {
+  async getChapters(bookId?: number, offset = 0, count = 50): Promise<any> {
     const params: any = { offset, count };
     if (bookId) params.filter = JSON.stringify({ book_id: bookId });
     
     const response = await this.client.get('/chapters', { params });
-    return response.data;
+    const data = response.data;
+    
+    return {
+      ...data,
+      data: data.data.map((chapter: Chapter) => this.enhanceChapterResponse(chapter))
+    };
   }
 
-  async getChapter(id: number): Promise<Chapter> {
+  async getChapter(id: number): Promise<any> {
     const response = await this.client.get(`/chapters/${id}`);
-    return response.data;
+    return this.enhanceChapterResponse(response.data);
   }
 
   async createPage(data: {
@@ -190,24 +281,24 @@ export class BookStackClient {
     markdown?: string;
     book_id: number;
     chapter_id?: number;
-  }): Promise<Page> {
+  }): Promise<any> {
     if (!this.enableWrite) {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
     }
     const response = await this.client.post('/pages', data);
-    return response.data;
+    return this.enhancePageResponse(response.data);
   }
 
   async updatePage(id: number, data: {
     name?: string;
     html?: string;
     markdown?: string;
-  }): Promise<Page> {
+  }): Promise<any> {
     if (!this.enableWrite) {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
     }
     const response = await this.client.put(`/pages/${id}`, data);
-    return response.data;
+    return this.enhancePageResponse(response.data);
   }
 
   async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext'): Promise<string> {

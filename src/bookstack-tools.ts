@@ -324,6 +324,7 @@ export class BookStackTools {
             },
             advanced_features: [
               "BookStack advanced search syntax: {type:page}, {book_id:5}, {created_by:me}",
+              "Embedded clickable URLs in all responses for direct BookStack access",
               "Pagination support up to 500 results per request", 
               "Multi-criteria filtering and custom sorting",
               "Export capabilities in multiple formats"
