@@ -122,6 +122,3 @@ Thumbs.db
 
 # Docker
 .dockerignore
-
-# File cache directory
-cache/

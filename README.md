@@ -243,6 +243,7 @@ docker compose logs -f bookstack-mcp
 docker compose down
 ```
 
+
 #### LibreChat Integration Commands
 
 ```bash

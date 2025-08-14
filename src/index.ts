@@ -3,7 +3,6 @@
 import { BookStackClient, BookStackConfig } from "./bookstack-client.js";
 import { BookStackTools } from "./bookstack-tools.js";
 import { SSETransportServer } from "./sse-transport.js";
-import { FileCache } from "./file-cache.js";
 
 function getRequiredEnvVar(name: string): string {
   const value = process.env[name];
@@ -65,16 +64,11 @@ async function main() {
       console.log('ℹ️  Only read operations available. Set BOOKSTACK_ENABLE_WRITE=true to enable writes.');
     }
 
-    // Initialize file cache with configurable duration
-    const cacheDurationMinutes = parseInt(process.env.CACHE_DURATION_MINUTES || '10');
-    const fileCache = new FileCache('./cache', cacheDurationMinutes);
-
-    const client = new BookStackClient(config, fileCache);
+    const client = new BookStackClient(config);
     const tools = new BookStackTools(client, config.enableWrite);
-    const sseServer = new SSETransportServer(tools, fileCache);
+    const sseServer = new SSETransportServer(tools);
 
     const port = parseInt(process.env.PORT || '8007');
-    
     sseServer.start(port);
 
   } catch (error) {

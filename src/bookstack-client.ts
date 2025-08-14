@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from 'axios';
-import { FileCache } from './file-cache.js';
 
 export interface BookStackConfig {
   baseUrl: string;
@@ -101,12 +100,10 @@ export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
   private baseUrl: string;
-  private fileCache: FileCache;
 
-  constructor(config: BookStackConfig, fileCache?: FileCache) {
+  constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
     this.baseUrl = config.baseUrl;
-    this.fileCache = fileCache || new FileCache();
     this.client = axios.create({
       baseURL: `${config.baseUrl}/api`,
       headers: {
@@ -395,52 +392,36 @@ export class BookStackClient {
 
   async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
     try {
-      const config: any = {};
-      
-      // For binary formats (PDF, ZIP), we need to handle them differently
+      // For binary formats (PDF, ZIP), return BookStack direct URL
       if (format === 'pdf' || format === 'zip') {
-        config.responseType = 'arraybuffer';
-      }
-      
-      console.error(`Exporting page ${id} as ${format}...`);
-      const response = await this.client.get(`/pages/${id}/export/${format}`, config);
-      console.error(`Export response status: ${response.status}`);
-      
-      // For binary formats, cache file and return download link
-      if (format === 'pdf' || format === 'zip') {
-        if (!response.data || response.data.byteLength === 0) {
-          throw new Error(`Empty ${format} file returned from BookStack API`);
-        }
-        
-        const buffer = Buffer.from(response.data);
-        console.error(`PDF/ZIP buffer size: ${buffer.length} bytes`);
-        
+        const directUrl = `${this.baseUrl}/pages/${id}/export/${format}`;
         const filename = `page-${id}.${format}`;
-        const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
-        
-        const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+        const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
         
         return {
           format: format,
           filename: filename,
-          size_bytes: buffer.length,
-          download_url: cacheInfo.downloadUrl,
-          expires_at: cacheInfo.expiresAt.toISOString(),
-          content_type: mimeType,
+          download_url: directUrl,
+          content_type: contentType,
           export_success: true,
           page_id: id,
-          cache_id: cacheInfo.id
+          direct_download: true,
+          note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
         };
+      } else {
+        // For text formats, fetch the content
+        console.error(`Exporting page ${id} as ${format}...`);
+        const response = await this.client.get(`/pages/${id}/export/${format}`);
+        console.error(`Export response status: ${response.status}`);
+        
+        // For text formats, validate and return as string
+        if (!response.data) {
+          throw new Error(`Empty ${format} content returned from BookStack API`);
+        }
+        
+        console.error(`Text export length: ${response.data.length} characters`);
+        return response.data;
       }
-      
-      // For text formats, validate and return as string
-      if (!response.data) {
-        throw new Error(`Empty ${format} content returned from BookStack API`);
-      }
-      
-      console.error(`Text export length: ${response.data.length} characters`);
-      return response.data;
-      
     } catch (error) {
       console.error(`Export error for page ${id}:`, error);
       throw new Error(`Failed to export page ${id} as ${format}: ${error instanceof Error ? error.message : String(error)}`);
@@ -448,72 +429,50 @@ export class BookStackClient {
   }
 
   async exportBook(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
-    const config: any = {};
-    
-    // For binary formats (PDF, ZIP), we need to handle them differently
+    // For binary formats (PDF, ZIP), return BookStack direct URL
     if (format === 'pdf' || format === 'zip') {
-      config.responseType = 'arraybuffer';
-    }
-    
-    const response = await this.client.get(`/books/${id}/export/${format}`, config);
-    
-    // For binary formats, cache file and return download link
-    if (format === 'pdf' || format === 'zip') {
-      const buffer = Buffer.from(response.data);
+      const directUrl = `${this.baseUrl}/books/${id}/export/${format}`;
       const filename = `book-${id}.${format}`;
-      const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
-      
-      const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+      const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
       
       return {
         format: format,
         filename: filename,
-        size_bytes: buffer.length,
-        download_url: cacheInfo.downloadUrl,
-        expires_at: cacheInfo.expiresAt.toISOString(),
-        content_type: mimeType,
+        download_url: directUrl,
+        content_type: contentType,
         export_success: true,
         book_id: id,
-        cache_id: cacheInfo.id
+        direct_download: true,
+        note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
       };
     }
     
-    // For text formats, return as string
+    // For text formats, fetch the content
+    const response = await this.client.get(`/books/${id}/export/${format}`);
     return response.data;
   }
 
   async exportChapter(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
-    const config: any = {};
-    
-    // For binary formats (PDF, ZIP), we need to handle them differently
+    // For binary formats (PDF, ZIP), return BookStack direct URL
     if (format === 'pdf' || format === 'zip') {
-      config.responseType = 'arraybuffer';
-    }
-    
-    const response = await this.client.get(`/chapters/${id}/export/${format}`, config);
-    
-    // For binary formats, cache file and return download link
-    if (format === 'pdf' || format === 'zip') {
-      const buffer = Buffer.from(response.data);
+      const directUrl = `${this.baseUrl}/chapters/${id}/export/${format}`;
       const filename = `chapter-${id}.${format}`;
-      const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
-      
-      const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+      const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
       
       return {
         format: format,
         filename: filename,
-        size_bytes: buffer.length,
-        download_url: cacheInfo.downloadUrl,
-        expires_at: cacheInfo.expiresAt.toISOString(),
-        content_type: mimeType,
+        download_url: directUrl,
+        content_type: contentType,
         export_success: true,
         chapter_id: id,
-        cache_id: cacheInfo.id
+        direct_download: true,
+        note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
       };
     }
     
-    // For text formats, return as string
+    // For text formats, fetch the content
+    const response = await this.client.get(`/chapters/${id}/export/${format}`);
     return response.data;
   }
 

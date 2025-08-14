@@ -205,7 +205,7 @@ export class BookStackTools {
       },
       {
         name: "export_page",
-        description: "Export a page in various formats",
+        description: "Export a page in various formats (PDF/ZIP provide direct BookStack download URLs)",
         inputSchema: {
           type: "object",
           properties: {
@@ -224,7 +224,7 @@ export class BookStackTools {
       },
       {
         name: "export_book",
-        description: "Export a book in various formats including PDF with proper binary handling",
+        description: "Export a book in various formats (PDF/ZIP provide direct BookStack download URLs)",
         inputSchema: {
           type: "object",
           properties: {
@@ -243,7 +243,7 @@ export class BookStackTools {
       },
       {
         name: "export_chapter",
-        description: "Export a chapter in various formats including PDF with proper binary handling",
+        description: "Export a chapter in various formats (PDF/ZIP provide direct BookStack download URLs)",
         inputSchema: {
           type: "object",
           properties: {
@@ -797,25 +797,20 @@ export class BookStackTools {
             throw new Error(`Export returned empty content for page ${args.id} in ${args.format} format`);
           }
           
-          // Handle binary formats (PDF, ZIP) with download links
-          if (typeof exportedContent === 'object' && exportedContent.download_url) {
+          // Handle binary formats (PDF, ZIP) with direct BookStack URLs
+          if (typeof exportedContent === 'object' && exportedContent.download_url && exportedContent.direct_download) {
             const format = (args.format as string).toUpperCase();
-            const expiresAt = new Date(exportedContent.expires_at);
-            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
             
             return {
               content: [
                 {
                   type: "text",
-                  text: `✅ **${format} Export Successful**\n\n` +
+                  text: `✅ **${format} Export Ready**\n\n` +
                         `📄 **File:** ${exportedContent.filename}\n` +
-                        `📊 **Size:** ${(exportedContent.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedContent.content_type}\n\n` +
-                        `🚀 **Ready to Download:**\n` +
+                        `🚀 **Direct Download Link:**\n` +
                         `${exportedContent.download_url}\n\n` +
-                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
-                        `📅 **Exact Expiry:** ${expiresAt.toLocaleString()}\n\n` +
-                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
+                        `ℹ️  **Note:** ${exportedContent.note}`
                 }
               ]
             };
@@ -838,25 +833,21 @@ export class BookStackTools {
         case "export_book":
           const exportedBook = await this.client.exportBook(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
           
-          // Handle binary formats with download links
-          if (typeof exportedBook === 'object' && exportedBook.download_url) {
+          // Handle binary formats with direct BookStack URLs
+          if (typeof exportedBook === 'object' && exportedBook.download_url && exportedBook.direct_download) {
             const format = (args.format as string).toUpperCase();
-            const expiresAt = new Date(exportedBook.expires_at);
-            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
             
             return {
               content: [
                 {
                   type: "text",
-                  text: `✅ **${format} Book Export Successful**\n\n` +
+                  text: `✅ **${format} Book Export Ready**\n\n` +
                         `📚 **Book ID:** ${args.id}\n` +
                         `📄 **File:** ${exportedBook.filename}\n` +
-                        `📊 **Size:** ${(exportedBook.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedBook.content_type}\n\n` +
-                        `🚀 **Ready to Download:**\n` +
+                        `🚀 **Direct Download Link:**\n` +
                         `${exportedBook.download_url}\n\n` +
-                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
-                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
+                        `ℹ️  **Note:** ${exportedBook.note}`
                 }
               ]
             };
@@ -872,25 +863,21 @@ export class BookStackTools {
         case "export_chapter":
           const exportedChapter = await this.client.exportChapter(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
           
-          // Handle binary formats with download links
-          if (typeof exportedChapter === 'object' && exportedChapter.download_url) {
+          // Handle binary formats with direct BookStack URLs
+          if (typeof exportedChapter === 'object' && exportedChapter.download_url && exportedChapter.direct_download) {
             const format = (args.format as string).toUpperCase();
-            const expiresAt = new Date(exportedChapter.expires_at);
-            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
             
             return {
               content: [
                 {
                   type: "text",
-                  text: `✅ **${format} Chapter Export Successful**\n\n` +
+                  text: `✅ **${format} Chapter Export Ready**\n\n` +
                         `📖 **Chapter ID:** ${args.id}\n` +
                         `📄 **File:** ${exportedChapter.filename}\n` +
-                        `📊 **Size:** ${(exportedChapter.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedChapter.content_type}\n\n` +
-                        `🚀 **Ready to Download:**\n` +
+                        `🚀 **Direct Download Link:**\n` +
                         `${exportedChapter.download_url}\n\n` +
-                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
-                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
+                        `ℹ️  **Note:** ${exportedChapter.note}`
                 }
               ]
             };
