@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "dev:stdio": "tsx src/stdio.ts",
     "start": "node dist/index.js",
+    "start:stdio": "node dist/stdio.js",
     "type-check": "tsc --noEmit"
   },
   "keywords": [

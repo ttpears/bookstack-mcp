@@ -2,18 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install system dependencies
+RUN apk add --no-cache git curl wget
 
-# Install all dependencies (including dev for build)
-RUN npm install
+# Clone the repository (self-contained approach)
+RUN git clone https://github.com/ttpears/bookstack-mcp.git .
 
-# Copy source code and build
-COPY tsconfig.json ./
-COPY src/ ./src/
-RUN npm run build
+# Install dependencies and build
+RUN npm install && npm run build
 
-# Remove dev dependencies and clean cache
+# Remove dev dependencies and clean cache  
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Create non-root user for security
@@ -24,10 +22,12 @@ RUN addgroup -g 1001 -S nodejs && \
 RUN chown -R nodejs:nodejs /app
 USER nodejs
 
+# Expose port for supergateway
 EXPOSE 8007
 
 # Health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8007/health || exit 1
 
-CMD ["node", "dist/index.js"]
+# Use supergateway to bridge stdio MCP server to HTTP/SSE
+CMD ["npx", "-y", "supergateway", "--stdio", "node dist/stdio.js", "--port", "8007"]

@@ -10,7 +10,6 @@ services:
       - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
       - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
       - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
-      - PORT=8007
     ports:
       - "8007:8007"
     restart: unless-stopped

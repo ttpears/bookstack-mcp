@@ -10,17 +10,23 @@ This guide provides step-by-step instructions for integrating the BookStack MCP 
 
 ## Integration Steps
 
-### Step 1: Clone into LibreChat Directory
+### Step 1: Environment Configuration
+
+**Option A: Self-Contained (Recommended)**
+The `Dockerfile.mcp-bookstack` automatically clones the repository, so you only need to configure environment variables.
+
+**Option B: Local Development**
+Clone the repository if you want to modify the code:
 
 ```bash
-# Navigate to your LibreChat directory
+# Navigate to your LibreChat directory (only if doing local development)
 cd /path/to/your/librechat
 
-# Clone the BookStack MCP repository
+# Clone the BookStack MCP repository (only if doing local development)
 git clone https://github.com/ttpears/bookstack-mcp.git bookstack-mcp
 ```
 
-### Step 2: Environment Configuration
+### Step 2: LibreChat Environment Variables
 
 Add the BookStack configuration to your LibreChat `.env` file:
 
@@ -46,7 +52,6 @@ services:
       - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
       - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
       - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
-      - PORT=8007
     ports:
       - "8007:8007"
     restart: unless-stopped
@@ -59,6 +64,11 @@ services:
       retries: 3
       start_period: 40s
 ```
+
+**Important:** The `Dockerfile.mcp-bookstack` is self-contained and:
+- Automatically clones the latest version from GitHub
+- Uses `supergateway` to bridge stdio MCP to HTTP/SSE  
+- No need to manually clone the repository
 
 ### Step 4: LibreChat MCP Configuration
 

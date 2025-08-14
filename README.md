@@ -5,10 +5,20 @@ A Model Context Protocol (MCP) server for BookStack with Server-Sent Events (SSE
 ## Features
 
 - **Full BookStack API Integration**: Search, read, create, and update content
-- **SSE Transport**: Compatible with LibreChat's SSE method
+- **Dual Transport Support**: Both SSE and stdio transports available
+- **LibreChat Compatible**: Self-contained Docker integration with supergateway
 - **Comprehensive Tools**: 10 different tools for BookStack operations
 - **Authentication**: Secure API token-based authentication
 - **TypeScript**: Full type safety and modern development experience
+
+## Architecture
+
+This server provides two different transport methods:
+
+1. **SSE Transport (`src/index.ts`)**: Direct HTTP/SSE server for standalone deployment
+2. **Stdio Transport (`src/stdio.ts`)**: MCP stdio server for use with supergateway in LibreChat
+
+The LibreChat integration uses the stdio version with supergateway to bridge to HTTP/SSE automatically.
 
 ## Available Tools
 
@@ -145,13 +155,23 @@ services:
       - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
       - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
       - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
-      - PORT=8007
     ports:
       - "8007:8007"
     restart: unless-stopped
     networks:
       - default
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 ```
+
+**Note:** The LibreChat integration uses `Dockerfile.mcp-bookstack` which:
+- Clones the repository directly (self-contained)
+- Uses `supergateway` to bridge the stdio MCP server to HTTP/SSE
+- Automatically handles the SSE endpoint creation
 
 ## Usage
 
