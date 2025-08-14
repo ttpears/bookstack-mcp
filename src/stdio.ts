@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { BookStackClient, BookStackConfig } from "./bookstack-client.js";
 import { BookStackTools } from "./bookstack-tools.js";
+import { FileCache } from "./file-cache.js";
 
 function getRequiredEnvVar(name: string): string {
   const value = process.env[name];
@@ -31,7 +32,11 @@ async function main() {
       console.error('ℹ️  Only read operations available. Set BOOKSTACK_ENABLE_WRITE=true to enable writes.');
     }
 
-    const client = new BookStackClient(config);
+    // Initialize file cache with configurable duration
+    const cacheDurationMinutes = parseInt(process.env.CACHE_DURATION_MINUTES || '10');
+    const fileCache = new FileCache('./cache', cacheDurationMinutes);
+
+    const client = new BookStackClient(config, fileCache);
     const tools = new BookStackTools(client, config.enableWrite);
 
     const server = new Server(

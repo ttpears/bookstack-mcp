@@ -797,9 +797,12 @@ export class BookStackTools {
             throw new Error(`Export returned empty content for page ${args.id} in ${args.format} format`);
           }
           
-          // Handle binary formats (PDF, ZIP) with LibreChat-compatible format
-          if (typeof exportedContent === 'object' && exportedContent.content_base64) {
+          // Handle binary formats (PDF, ZIP) with download links
+          if (typeof exportedContent === 'object' && exportedContent.download_url) {
             const format = (args.format as string).toUpperCase();
+            const expiresAt = new Date(exportedContent.expires_at);
+            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
+            
             return {
               content: [
                 {
@@ -808,14 +811,11 @@ export class BookStackTools {
                         `📄 **File:** ${exportedContent.filename}\n` +
                         `📊 **Size:** ${(exportedContent.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedContent.content_type}\n\n` +
-                        `**Download Link:**\n` +
-                        `\`data:${exportedContent.content_type};base64,${exportedContent.content_base64.substring(0, 50)}...\`\n\n` +
-                        `**Instructions:**\n` +
-                        `1. Copy the complete base64 data from the response below\n` +
-                        `2. Create a new file named "${exportedContent.filename}"\n` +
-                        `3. Decode the base64 content to binary format\n` +
-                        `4. Save as ${format} file\n\n` +
-                        `**Full Base64 Content:**\n\`\`\`\n${exportedContent.content_base64}\n\`\`\``
+                        `🚀 **Ready to Download:**\n` +
+                        `${exportedContent.download_url}\n\n` +
+                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
+                        `📅 **Exact Expiry:** ${expiresAt.toLocaleString()}\n\n` +
+                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
                 }
               ]
             };
@@ -838,9 +838,12 @@ export class BookStackTools {
         case "export_book":
           const exportedBook = await this.client.exportBook(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
           
-          // Handle binary formats with LibreChat-compatible format
-          if (typeof exportedBook === 'object' && exportedBook.content_base64) {
+          // Handle binary formats with download links
+          if (typeof exportedBook === 'object' && exportedBook.download_url) {
             const format = (args.format as string).toUpperCase();
+            const expiresAt = new Date(exportedBook.expires_at);
+            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
+            
             return {
               content: [
                 {
@@ -850,7 +853,10 @@ export class BookStackTools {
                         `📄 **File:** ${exportedBook.filename}\n` +
                         `📊 **Size:** ${(exportedBook.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedBook.content_type}\n\n` +
-                        `**Full Base64 Content:**\n\`\`\`\n${exportedBook.content_base64}\n\`\`\``
+                        `🚀 **Ready to Download:**\n` +
+                        `${exportedBook.download_url}\n\n` +
+                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
+                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
                 }
               ]
             };
@@ -866,9 +872,12 @@ export class BookStackTools {
         case "export_chapter":
           const exportedChapter = await this.client.exportChapter(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
           
-          // Handle binary formats with LibreChat-compatible format
-          if (typeof exportedChapter === 'object' && exportedChapter.content_base64) {
+          // Handle binary formats with download links
+          if (typeof exportedChapter === 'object' && exportedChapter.download_url) {
             const format = (args.format as string).toUpperCase();
+            const expiresAt = new Date(exportedChapter.expires_at);
+            const minutesUntilExpiry = Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60));
+            
             return {
               content: [
                 {
@@ -878,7 +887,10 @@ export class BookStackTools {
                         `📄 **File:** ${exportedChapter.filename}\n` +
                         `📊 **Size:** ${(exportedChapter.size_bytes / 1024).toFixed(1)} KB\n` +
                         `🔗 **Type:** ${exportedChapter.content_type}\n\n` +
-                        `**Full Base64 Content:**\n\`\`\`\n${exportedChapter.content_base64}\n\`\`\``
+                        `🚀 **Ready to Download:**\n` +
+                        `${exportedChapter.download_url}\n\n` +
+                        `⏰ **Cache Expires:** ${minutesUntilExpiry} minutes from now\n` +
+                        `ℹ️  **Note:** Cache duration is user-configurable (currently ${process.env.CACHE_DURATION_MINUTES || '10'} minutes)`
                 }
               ]
             };

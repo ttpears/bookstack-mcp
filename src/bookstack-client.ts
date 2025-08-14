@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { FileCache } from './file-cache.js';
 
 export interface BookStackConfig {
   baseUrl: string;
@@ -100,10 +101,12 @@ export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
   private baseUrl: string;
+  private fileCache: FileCache;
 
-  constructor(config: BookStackConfig) {
+  constructor(config: BookStackConfig, fileCache?: FileCache) {
     this.enableWrite = config.enableWrite || false;
     this.baseUrl = config.baseUrl;
+    this.fileCache = fileCache || new FileCache();
     this.client = axios.create({
       baseURL: `${config.baseUrl}/api`,
       headers: {
@@ -403,7 +406,7 @@ export class BookStackClient {
       const response = await this.client.get(`/pages/${id}/export/${format}`, config);
       console.error(`Export response status: ${response.status}`);
       
-      // For binary formats, return base64 encoded data with metadata
+      // For binary formats, cache file and return download link
       if (format === 'pdf' || format === 'zip') {
         if (!response.data || response.data.byteLength === 0) {
           throw new Error(`Empty ${format} file returned from BookStack API`);
@@ -412,15 +415,21 @@ export class BookStackClient {
         const buffer = Buffer.from(response.data);
         console.error(`PDF/ZIP buffer size: ${buffer.length} bytes`);
         
+        const filename = `page-${id}.${format}`;
+        const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
+        
+        const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+        
         return {
           format: format,
-          filename: `page-${id}.${format}`,
+          filename: filename,
           size_bytes: buffer.length,
-          content_base64: buffer.toString('base64'),
-          download_note: 'Binary content encoded as base64. Save and decode to access the file.',
-          content_type: format === 'pdf' ? 'application/pdf' : 'application/zip',
+          download_url: cacheInfo.downloadUrl,
+          expires_at: cacheInfo.expiresAt.toISOString(),
+          content_type: mimeType,
           export_success: true,
-          page_id: id
+          page_id: id,
+          cache_id: cacheInfo.id
         };
       }
       
@@ -448,16 +457,24 @@ export class BookStackClient {
     
     const response = await this.client.get(`/books/${id}/export/${format}`, config);
     
-    // For binary formats, return base64 encoded data with metadata
+    // For binary formats, cache file and return download link
     if (format === 'pdf' || format === 'zip') {
       const buffer = Buffer.from(response.data);
+      const filename = `book-${id}.${format}`;
+      const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
+      
+      const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+      
       return {
         format: format,
-        filename: `book-${id}.${format}`,
+        filename: filename,
         size_bytes: buffer.length,
-        content_base64: buffer.toString('base64'),
-        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
-        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
+        download_url: cacheInfo.downloadUrl,
+        expires_at: cacheInfo.expiresAt.toISOString(),
+        content_type: mimeType,
+        export_success: true,
+        book_id: id,
+        cache_id: cacheInfo.id
       };
     }
     
@@ -475,16 +492,24 @@ export class BookStackClient {
     
     const response = await this.client.get(`/chapters/${id}/export/${format}`, config);
     
-    // For binary formats, return base64 encoded data with metadata
+    // For binary formats, cache file and return download link
     if (format === 'pdf' || format === 'zip') {
       const buffer = Buffer.from(response.data);
+      const filename = `chapter-${id}.${format}`;
+      const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip';
+      
+      const cacheInfo = await this.fileCache.cacheFile(buffer, filename, mimeType);
+      
       return {
         format: format,
-        filename: `chapter-${id}.${format}`,
+        filename: filename,
         size_bytes: buffer.length,
-        content_base64: buffer.toString('base64'),
-        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
-        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
+        download_url: cacheInfo.downloadUrl,
+        expires_at: cacheInfo.expiresAt.toISOString(),
+        content_type: mimeType,
+        export_success: true,
+        chapter_id: id,
+        cache_id: cacheInfo.id
       };
     }
     

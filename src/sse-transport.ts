@@ -3,14 +3,17 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { BookStackTools } from "./bookstack-tools.js";
+import { FileCache } from "./file-cache.js";
 
 export class SSETransportServer {
   private app = express();
   private transports: Map<string, SSEServerTransport> = new Map();
   private bookStackTools: BookStackTools;
+  private fileCache: FileCache;
 
-  constructor(bookStackTools: BookStackTools) {
+  constructor(bookStackTools: BookStackTools, fileCache: FileCache) {
     this.bookStackTools = bookStackTools;
+    this.fileCache = fileCache;
     this.setupRoutes();
   }
 
@@ -102,6 +105,36 @@ export class SSETransportServer {
 
       } catch (error) {
         console.error("Error in message endpoint:", error);
+        res.status(500).send("Internal server error");
+      }
+    });
+
+    // Download endpoint for cached files
+    this.app.get("/download/:fileId", async (req, res) => {
+      try {
+        const fileId = req.params.fileId;
+        const cachedFileData = await this.fileCache.getCachedFileData(fileId);
+
+        if (!cachedFileData) {
+          res.status(404).send("File not found or expired");
+          return;
+        }
+
+        const { data, file } = cachedFileData;
+
+        // Set appropriate headers
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Expires', '0');
+
+        console.error(`Serving cached file: ${file.filename} (${(file.size / 1024).toFixed(1)} KB)`);
+        
+        res.send(data);
+
+      } catch (error) {
+        console.error("Error serving cached file:", error);
         res.status(500).send("Internal server error");
       }
     });
