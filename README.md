@@ -22,16 +22,22 @@ The LibreChat integration uses the stdio version with supergateway to bridge to 
 
 ## Available Tools
 
-1. **search_content** - Search across books, pages, and chapters
-2. **get_books** - List available books with pagination
-3. **get_book** - Get detailed information about a specific book
-4. **get_pages** - List pages, optionally filtered by book
-5. **get_page** - Get full content of a specific page
-6. **get_chapters** - List chapters, optionally filtered by book
-7. **get_chapter** - Get details of a specific chapter
-8. **create_page** - Create new pages in BookStack
-9. **update_page** - Update existing pages
-10. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text)
+### Read Operations (Always Available)
+1. **search_content** - Advanced search with filtering, pagination, and BookStack search syntax
+2. **search_pages** - Search specifically for pages with optional book filtering  
+3. **get_books** - List books with advanced filtering, sorting, and pagination
+4. **get_book** - Get detailed information about a specific book
+5. **get_pages** - List pages with filtering by book, chapter, custom criteria, and sorting
+6. **get_page** - Get full content of a specific page
+7. **get_chapters** - List chapters with advanced filtering options
+8. **get_chapter** - Get details of a specific chapter
+9. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text)
+
+### Write Operations (Requires BOOKSTACK_ENABLE_WRITE=true)
+10. **create_page** - Create new pages in BookStack
+11. **update_page** - Update existing pages
+
+**Security Note:** Write operations are disabled by default. Set `BOOKSTACK_ENABLE_WRITE=true` to enable page creation and updates.
 
 ## Installation
 
@@ -103,7 +109,15 @@ BOOKSTACK_TOKEN_SECRET=your-token-secret
 
 # Optional: Server Configuration
 PORT=8007
+
+# Optional: Security Configuration
+BOOKSTACK_ENABLE_WRITE=false  # Set to 'true' to enable write operations
 ```
+
+**Important Security Notes:**
+- Write operations (create/update pages) are **disabled by default**
+- Only enable writes if you fully trust the AI system with your BookStack content
+- Consider using a dedicated BookStack user with limited permissions for API access
 
 ### BookStack API Setup
 
@@ -296,14 +310,29 @@ PORT=8007
 
 Once configured, you can use BookStack tools in LibreChat conversations:
 
+**Advanced Search Examples:**
 ```
-"Search for documentation about API authentication"
-"Show me the contents of page 123"
-"Create a new page in book 5 with markdown content"
-"List all pages in the 'Documentation' book"
+"Search for pages containing 'API authentication'"
+"Find all pages in book 5 created this year"
+"Search for content created by user ID 1"
+"Show me the most recently updated pages in the Documentation book"
+```
+
+**Content Discovery:**
+```
+"List all books sorted by last updated"
+"Show me pages in chapter 3 of the User Guide"
 "Export page 456 as markdown"
-"Find all pages in the 'User Guide' book"
+"Get the content of the Installation Guide page"
 ```
+
+**Write Operations (if enabled):**
+```
+"Create a new troubleshooting page in book 5"
+"Update page 123 with the latest API changes"
+```
+
+**Note:** Write operations require `BOOKSTACK_ENABLE_WRITE=true` in your environment variables.
 
 ### Direct API Testing (Standalone)
 

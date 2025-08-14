@@ -24,6 +24,7 @@ Environment Variables Required:
 
 Optional Environment Variables:
   PORT                  - Server port (default: 8007)
+  BOOKSTACK_ENABLE_WRITE - Enable write operations (default: false)
 
 Usage:
   npm run dev           - Start development server
@@ -52,7 +53,8 @@ async function main() {
     const config: BookStackConfig = {
       baseUrl: getRequiredEnvVar('BOOKSTACK_BASE_URL'),
       tokenId: getRequiredEnvVar('BOOKSTACK_TOKEN_ID'),
-      tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET')
+      tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
+      enableWrite: process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true'
     };
 
     console.log('Initializing BookStack MCP Server...');

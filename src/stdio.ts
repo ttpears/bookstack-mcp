@@ -20,7 +20,8 @@ async function main() {
     const config: BookStackConfig = {
       baseUrl: getRequiredEnvVar('BOOKSTACK_BASE_URL'),
       tokenId: getRequiredEnvVar('BOOKSTACK_TOKEN_ID'),
-      tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET')
+      tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
+      enableWrite: process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true'
     };
 
     console.error('Initializing BookStack MCP Server (stdio)...');

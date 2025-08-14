@@ -36,6 +36,9 @@ The `Dockerfile.mcp-bookstack` is self-contained and handles everything automati
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
 echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
 echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
+
+# Optional: Enable write operations (DANGEROUS - only if you trust the AI)
+echo "BOOKSTACK_ENABLE_WRITE=false" >> .env
 ```
 
 **Example `.env` entries:**
@@ -43,7 +46,10 @@ echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
 BOOKSTACK_BASE_URL=https://bookstack.example.com
 BOOKSTACK_TOKEN_ID=abc123def456
 BOOKSTACK_TOKEN_SECRET=xyz789uvw012
+BOOKSTACK_ENABLE_WRITE=false
 ```
+
+**Security Warning:** Write operations are disabled by default. Only set `BOOKSTACK_ENABLE_WRITE=true` if you fully trust the AI system with your BookStack content.
 
 ⚠️ **Without these environment variables, the BookStack MCP service will fail to start.**
 

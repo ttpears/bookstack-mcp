@@ -12,18 +12,54 @@ export class BookStackTools {
     return [
       {
         name: "search_content",
-        description: "Search across BookStack content (books, pages, chapters)",
+        description: "Search across BookStack content with advanced filtering",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Search query"
+              description: "Search query. Use BookStack advanced search syntax like {type:page} or {created_by:me}"
             },
             type: {
               type: "string",
-              enum: ["book", "page", "chapter"],
-              description: "Optional: Filter by content type"
+              enum: ["book", "page", "chapter", "bookshelf"],
+              description: "Filter by content type (automatically adds {type:X} to query)"
+            },
+            count: {
+              type: "number",
+              description: "Number of results to return (max 500)",
+              maximum: 500
+            },
+            offset: {
+              type: "number", 
+              description: "Number of results to skip for pagination"
+            }
+          },
+          required: ["query"]
+        }
+      },
+      {
+        name: "search_pages",
+        description: "Search specifically for pages with optional book filtering",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query for pages"
+            },
+            book_id: {
+              type: "number",
+              description: "Filter results to pages within a specific book"
+            },
+            count: {
+              type: "number",
+              description: "Number of results to return (max 500)",
+              maximum: 500
+            },
+            offset: {
+              type: "number",
+              description: "Number of results to skip for pagination"
             }
           },
           required: ["query"]
@@ -31,7 +67,7 @@ export class BookStackTools {
       },
       {
         name: "get_books",
-        description: "List available books",
+        description: "List available books with advanced filtering and sorting",
         inputSchema: {
           type: "object",
           properties: {
@@ -42,8 +78,17 @@ export class BookStackTools {
             },
             count: {
               type: "number",
-              description: "Number of results to return (default: 50)",
-              default: 50
+              description: "Number of results to return (default: 50, max: 500)",
+              default: 50,
+              maximum: 500
+            },
+            sort: {
+              type: "string",
+              description: "Sort field (e.g., 'name', '-created_at', 'updated_at')"
+            },
+            filter: {
+              type: "object",
+              description: "Filter criteria (e.g., {'owned_by': 1, 'created_at': '>=2024-01-01'})"
             }
           }
         }
@@ -64,13 +109,17 @@ export class BookStackTools {
       },
       {
         name: "get_pages",
-        description: "List pages, optionally filtered by book",
+        description: "List pages with advanced filtering by book, chapter, and custom criteria",
         inputSchema: {
           type: "object",
           properties: {
             book_id: {
               type: "number",
-              description: "Optional: Filter by book ID"
+              description: "Filter by book ID"
+            },
+            chapter_id: {
+              type: "number", 
+              description: "Filter by chapter ID"
             },
             offset: {
               type: "number",
@@ -79,8 +128,17 @@ export class BookStackTools {
             },
             count: {
               type: "number",
-              description: "Number of results to return (default: 50)",
-              default: 50
+              description: "Number of results to return (default: 50, max: 500)",
+              default: 50,
+              maximum: 500
+            },
+            sort: {
+              type: "string",
+              description: "Sort field (e.g., 'name', '-updated_at', 'created_at')"
+            },
+            filter: {
+              type: "object",
+              description: "Additional filter criteria"
             }
           }
         }
@@ -224,7 +282,11 @@ export class BookStackTools {
     try {
       switch (name) {
         case "search_content":
-          const searchResults = await this.client.searchContent(args.query as string, args.type as string);
+          const searchResults = await this.client.searchContent(args.query as string, {
+            type: args.type as any,
+            count: args.count as number,
+            offset: args.offset as number
+          });
           return {
             content: [{
               type: "text",
@@ -232,8 +294,26 @@ export class BookStackTools {
             }]
           };
 
+        case "search_pages":
+          const pageResults = await this.client.searchPages(args.query as string, {
+            bookId: args.book_id as number,
+            count: args.count as number,
+            offset: args.offset as number
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(pageResults, null, 2)
+            }]
+          };
+
         case "get_books":
-          const books = await this.client.getBooks(args.offset as number, args.count as number);
+          const books = await this.client.getBooks({
+            offset: args.offset as number,
+            count: args.count as number,
+            sort: args.sort as string,
+            filter: args.filter as Record<string, any>
+          });
           return {
             content: [{
               type: "text",
@@ -251,7 +331,14 @@ export class BookStackTools {
           };
 
         case "get_pages":
-          const pages = await this.client.getPages(args.book_id as number, args.offset as number, args.count as number);
+          const pages = await this.client.getPages({
+            bookId: args.book_id as number,
+            chapterId: args.chapter_id as number,
+            offset: args.offset as number,
+            count: args.count as number,
+            sort: args.sort as string,
+            filter: args.filter as Record<string, any>
+          });
           return {
             content: [{
               type: "text",
