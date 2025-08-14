@@ -21,7 +21,7 @@ export class BookStackTools {
       },
       {
         name: "search_content",
-        description: "Search across BookStack content with advanced filtering. Use for queries like 'latest changes', 'recent updates', 'find content', etc.",
+        description: "Search across BookStack content with contextual previews and location info. Use for queries like 'find content', 'search for', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -118,7 +118,7 @@ export class BookStackTools {
       },
       {
         name: "get_pages",
-        description: "List pages with advanced filtering by book, chapter, and custom criteria. Use for 'show pages', 'latest pages', 'recent pages', 'get pages from book', etc.",
+        description: "List pages with content previews, word counts, and contextual information. Use for 'show pages', 'latest pages', 'recent pages', 'get pages from book', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -224,7 +224,7 @@ export class BookStackTools {
       },
       {
         name: "get_recent_changes",
-        description: "Get recently updated content from BookStack. Perfect for 'latest changes', 'recent updates', 'what's new', etc.",
+        description: "Get recently updated content with contextual previews and change descriptions. Perfect for 'latest changes', 'recent updates', 'what's new', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -603,11 +603,19 @@ export class BookStackTools {
               "Export capabilities in multiple formats"
             ],
             natural_language_examples: [
-              "Say 'Get the latest changes from bookstack' to search recent content",
-              "Say 'Show me recent pages' to list recently updated pages",
-              "Say 'What books are available?' to get the book list",
-              "Say 'Find pages about authentication' to search content",
-              "Say 'Show chapters in the user guide' to list specific chapters"
+              "Say 'Get the latest changes from bookstack' to search recent content with previews",
+              "Say 'Show me recent pages' to list recently updated pages with context",
+              "Say 'What books are available?' to get the book list with descriptions",
+              "Say 'Find pages about authentication' to search content with previews",
+              "Say 'Show chapters in the user guide' to list specific chapters with summaries"
+            ],
+            response_enhancements: [
+              "Content previews: All responses include meaningful text previews (150-200 chars)",
+              "Human-friendly dates: 'Updated 2 hours ago' instead of timestamps",
+              "Contextual location: 'In Book: User Guide, Chapter: Authentication'", 
+              "Change summaries: Descriptive explanations of what was updated",
+              "Word counts and content metrics for pages",
+              "Rich metadata: Creation dates, update history, author info"
             ],
             security_note: this.enableWrite 
               ? "⚠️  Write operations are ENABLED - AI can create and modify BookStack content"

@@ -83,6 +83,8 @@ export interface SearchResult {
   slug: string;
   book_id?: number;
   chapter_id?: number;
+  created_at?: string;
+  updated_at?: string;
   preview_content?: {
     name: string;
     content: string;
@@ -135,35 +137,70 @@ export class BookStackClient {
 
   // Enhanced response helpers
   private enhanceBookResponse(book: Book): any {
+    const lastUpdated = this.formatDate(book.updated_at);
+    const created = this.formatDate(book.created_at);
+    
     return {
       ...book,
       url: this.generateBookUrl(book),
-      direct_link: `[${book.name}](${this.generateBookUrl(book)})`
+      direct_link: `[${book.name}](${this.generateBookUrl(book)})`,
+      last_updated_friendly: lastUpdated,
+      created_friendly: created,
+      summary: book.description ? `${book.description.substring(0, 100)}${book.description.length > 100 ? '...' : ''}` : 'No description available',
+      content_info: `Book created ${created}, last updated ${lastUpdated}`
     };
   }
 
   private enhancePageResponse(page: Page): any {
+    const lastUpdated = this.formatDate(page.updated_at);
+    const created = this.formatDate(page.created_at);
+    const contentPreview = page.text ? `${page.text.substring(0, 200)}${page.text.length > 200 ? '...' : ''}` : 'No content preview available';
+    
     return {
       ...page,
       url: this.generatePageUrl(page),
-      direct_link: `[${page.name}](${this.generatePageUrl(page)})`
+      direct_link: `[${page.name}](${this.generatePageUrl(page)})`,
+      last_updated_friendly: lastUpdated,
+      created_friendly: created,
+      content_preview: contentPreview,
+      content_info: `Page created ${created}, last updated ${lastUpdated}`,
+      word_count: page.text ? page.text.split(' ').length : 0,
+      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`
     };
   }
 
   private enhanceChapterResponse(chapter: Chapter): any {
+    const lastUpdated = this.formatDate(chapter.updated_at);
+    const created = this.formatDate(chapter.created_at);
+    
     return {
       ...chapter,
       url: this.generateChapterUrl(chapter),
-      direct_link: `[${chapter.name}](${this.generateChapterUrl(chapter)})`
+      direct_link: `[${chapter.name}](${this.generateChapterUrl(chapter)})`,
+      last_updated_friendly: lastUpdated,
+      created_friendly: created,
+      summary: chapter.description ? `${chapter.description.substring(0, 100)}${chapter.description.length > 100 ? '...' : ''}` : 'No description available',
+      content_info: `Chapter created ${created}, last updated ${lastUpdated}`,
+      location: `In Book ID ${chapter.book_id}`
     };
   }
 
   private enhanceShelfResponse(shelf: Shelf): any {
+    const lastUpdated = this.formatDate(shelf.updated_at);
+    const created = this.formatDate(shelf.created_at);
+    const bookCount = shelf.books?.length || 0;
+    
     return {
       ...shelf,
       url: this.generateShelfUrl(shelf),
       direct_link: `[${shelf.name}](${this.generateShelfUrl(shelf)})`,
-      books: shelf.books?.map(book => this.enhanceBookResponse(book))
+      last_updated_friendly: lastUpdated,
+      created_friendly: created,
+      summary: shelf.description ? `${shelf.description.substring(0, 100)}${shelf.description.length > 100 ? '...' : ''}` : 'No description available',
+      content_info: `Shelf with ${bookCount} book${bookCount !== 1 ? 's' : ''}, created ${created}, last updated ${lastUpdated}`,
+      book_count: bookCount,
+      books: shelf.books?.map(book => this.enhanceBookResponse(book)),
+      tags_summary: shelf.tags?.length ? `Tagged with: ${shelf.tags.map(t => `${t.name}${t.value ? `=${t.value}` : ''}`).join(', ')}` : 'No tags'
     };
   }
 
@@ -171,10 +208,14 @@ export class BookStackClient {
     return {
       search_query: originalQuery,
       search_url: this.generateSearchUrl(originalQuery),
+      summary: `Found ${results.length} results for "${originalQuery}"`,
       results: results.map(result => ({
         ...result,
         url: this.generateContentUrl(result),
-        direct_link: `[${result.name}](${this.generateContentUrl(result)})`
+        direct_link: `[${result.name}](${this.generateContentUrl(result)})`,
+        content_preview: result.preview_content?.content ? `${result.preview_content.content.substring(0, 150)}${result.preview_content.content.length > 150 ? '...' : ''}` : 'No preview available',
+        content_type: result.type.charAt(0).toUpperCase() + result.type.slice(1),
+        location_info: result.book_id ? `In book ID ${result.book_id}${result.chapter_id ? `, chapter ID ${result.chapter_id}` : ''}` : 'Location unknown'
       }))
     };
   }
@@ -383,17 +424,77 @@ export class BookStackClient {
     const response = await this.client.get('/search', { params });
     const results = response.data.data || response.data;
     
+    // Enhance results with additional context
+    const enhancedResults = await Promise.all(
+      results.map(async (result: SearchResult) => {
+        let contextualInfo = '';
+        let contentPreview = result.preview_content?.content || '';
+        
+        try {
+          // Get additional context based on content type
+          if (result.type === 'page' && result.id) {
+            const fullPage = await this.client.get(`/pages/${result.id}`);
+            const pageData = fullPage.data;
+            contentPreview = pageData.text?.substring(0, 200) || contentPreview;
+            contextualInfo = `Updated in book: ${pageData.book?.name || 'Unknown Book'}`;
+            if (pageData.chapter) {
+              contextualInfo += `, chapter: ${pageData.chapter.name}`;
+            }
+          } else if (result.type === 'book' && result.id) {
+            const fullBook = await this.client.get(`/books/${result.id}`);
+            const bookData = fullBook.data;
+            contentPreview = bookData.description?.substring(0, 200) || 'No description available';
+            contextualInfo = `Book with ${bookData.page_count || 0} pages`;
+          } else if (result.type === 'chapter' && result.id) {
+            const fullChapter = await this.client.get(`/chapters/${result.id}`);
+            const chapterData = fullChapter.data;
+            contentPreview = chapterData.description?.substring(0, 200) || 'No description available';
+            contextualInfo = `Chapter in book: ${chapterData.book?.name || 'Unknown Book'}`;
+          }
+        } catch (error) {
+          // If we can't get additional context, use what we have
+          contextualInfo = `${result.type.charAt(0).toUpperCase() + result.type.slice(1)} content`;
+        }
+
+        return {
+          ...result,
+          url: this.generateContentUrl(result),
+          direct_link: `[${result.name}](${this.generateContentUrl(result)})`,
+          content_preview: contentPreview ? `${contentPreview}${contentPreview.length >= 200 ? '...' : ''}` : 'No preview available',
+          contextual_info: contextualInfo,
+          last_updated: this.formatDate(result.updated_at || result.created_at || ''),
+          change_summary: `${result.type === 'page' ? 'Page' : result.type === 'book' ? 'Book' : 'Chapter'} "${result.name}" was updated`
+        };
+      })
+    );
+    
     return {
       search_query: `Recent changes in the last ${days} days (${type})`,
       date_threshold: dateFilter,
       search_url: this.generateSearchUrl(searchQuery),
       total_found: results.length,
-      results: results.map((result: SearchResult) => ({
-        ...result,
-        url: this.generateContentUrl(result),
-        direct_link: `[${result.name}](${this.generateContentUrl(result)})`
-      }))
+      summary: `Found ${results.length} items updated in the last ${days} days${type !== 'all' ? ` (${type}s only)` : ''}`,
+      results: enhancedResults
     };
+  }
+
+  private formatDate(dateString: string): string {
+    if (!dateString) return 'Unknown date';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than an hour ago';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) return `${diffInWeeks} weeks ago`;
+    
+    return date.toLocaleDateString();
   }
 
   // Shelves (Book Collections) Management
