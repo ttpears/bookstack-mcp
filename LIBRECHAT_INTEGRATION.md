@@ -29,14 +29,23 @@ The `Dockerfile.mcp-bookstack` is self-contained and handles everything automati
 
 ### Step 2: LibreChat Environment Variables
 
-Add the BookStack configuration to your LibreChat `.env` file:
+**CRITICAL:** Add the BookStack configuration to your LibreChat `.env` file:
 
 ```bash
-# Add to your LibreChat .env file
+# Add to your LibreChat .env file (replace with your actual values)
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
 echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
 echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
 ```
+
+**Example `.env` entries:**
+```env
+BOOKSTACK_BASE_URL=https://bookstack.example.com
+BOOKSTACK_TOKEN_ID=abc123def456
+BOOKSTACK_TOKEN_SECRET=xyz789uvw012
+```
+
+⚠️ **Without these environment variables, the BookStack MCP service will fail to start.**
 
 ### Step 3: Docker Compose Override
 
@@ -95,11 +104,17 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 # Verify all services are running
 docker compose ps
 
-# Check BookStack MCP logs
-docker compose logs -f bookstack-mcp
+# Check BookStack MCP logs - you should see:
+docker compose logs bookstack-mcp
 
-# Test health endpoint
-curl http://localhost:8007/health
+# Success indicators in logs:
+# [supergateway] Listening on port 8007
+# [supergateway] SSE endpoint: http://localhost:8007/sse
+# Initializing BookStack MCP Server (stdio)...
+# BookStack MCP server running on stdio
+
+# Test SSE endpoint (should not return connection errors)
+curl -i http://localhost:8007/sse
 ```
 
 ### Test LibreChat Integration
@@ -131,11 +146,41 @@ librechat/
 
 ### Service Won't Start
 
+**Most Common Issue: Missing Environment Variables**
+
+If you see this error:
+```
+[supergateway] Child stderr: Error: BOOKSTACK_BASE_URL environment variable is required
+[supergateway] Child exited: code=1, signal=null
+```
+
+**Solution:** Verify your BookStack environment variables are in LibreChat's `.env` file:
+
+```bash
+# Check your .env file contains BookStack variables
+grep BOOKSTACK .env
+
+# Should show:
+# BOOKSTACK_BASE_URL=https://your-bookstack.com
+# BOOKSTACK_TOKEN_ID=your-token-id  
+# BOOKSTACK_TOKEN_SECRET=your-token-secret
+
+# If missing, add them:
+echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
+echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
+echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
+
+# Restart LibreChat
+docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+```
+
+**Other Troubleshooting:**
+
 ```bash
 # Check Docker Compose configuration
 docker compose config
 
-# Check for environment variable issues
+# Verify environment variables are passed to container
 docker compose exec bookstack-mcp env | grep BOOKSTACK
 ```
 

@@ -76,7 +76,7 @@ This method requires the `Dockerfile.mcp-bookstack` file in your LibreChat direc
 # 1. Copy Dockerfile.mcp-bookstack to your LibreChat root directory
 # Download from: https://github.com/ttpears/bookstack-mcp/blob/main/Dockerfile.mcp-bookstack
 
-# 2. Add environment variables to your LibreChat .env file
+# 2. Add environment variables to your LibreChat .env file (REQUIRED)
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
 echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
 echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
