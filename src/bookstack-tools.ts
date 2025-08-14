@@ -797,9 +797,33 @@ export class BookStackTools {
             throw new Error(`Export returned empty content for page ${args.id} in ${args.format} format`);
           }
           
+          // Handle binary formats (PDF, ZIP) with LibreChat-compatible format
+          if (typeof exportedContent === 'object' && exportedContent.content_base64) {
+            const format = (args.format as string).toUpperCase();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `✅ **${format} Export Successful**\n\n` +
+                        `📄 **File:** ${exportedContent.filename}\n` +
+                        `📊 **Size:** ${(exportedContent.size_bytes / 1024).toFixed(1)} KB\n` +
+                        `🔗 **Type:** ${exportedContent.content_type}\n\n` +
+                        `**Download Link:**\n` +
+                        `\`data:${exportedContent.content_type};base64,${exportedContent.content_base64.substring(0, 50)}...\`\n\n` +
+                        `**Instructions:**\n` +
+                        `1. Copy the complete base64 data from the response below\n` +
+                        `2. Create a new file named "${exportedContent.filename}"\n` +
+                        `3. Decode the base64 content to binary format\n` +
+                        `4. Save as ${format} file\n\n` +
+                        `**Full Base64 Content:**\n\`\`\`\n${exportedContent.content_base64}\n\`\`\``
+                }
+              ]
+            };
+          }
+          
+          // Handle text formats 
           const contentText = typeof exportedContent === 'string' ? exportedContent : JSON.stringify(exportedContent, null, 2);
           
-          // Additional validation for content
           if (!contentText || contentText.trim().length === 0) {
             throw new Error(`Export produced empty content for page ${args.id} in ${args.format} format`);
           }
@@ -813,6 +837,25 @@ export class BookStackTools {
 
         case "export_book":
           const exportedBook = await this.client.exportBook(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
+          
+          // Handle binary formats with LibreChat-compatible format
+          if (typeof exportedBook === 'object' && exportedBook.content_base64) {
+            const format = (args.format as string).toUpperCase();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `✅ **${format} Book Export Successful**\n\n` +
+                        `📚 **Book ID:** ${args.id}\n` +
+                        `📄 **File:** ${exportedBook.filename}\n` +
+                        `📊 **Size:** ${(exportedBook.size_bytes / 1024).toFixed(1)} KB\n` +
+                        `🔗 **Type:** ${exportedBook.content_type}\n\n` +
+                        `**Full Base64 Content:**\n\`\`\`\n${exportedBook.content_base64}\n\`\`\``
+                }
+              ]
+            };
+          }
+          
           return {
             content: [{
               type: "text",
@@ -822,6 +865,25 @@ export class BookStackTools {
 
         case "export_chapter":
           const exportedChapter = await this.client.exportChapter(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
+          
+          // Handle binary formats with LibreChat-compatible format
+          if (typeof exportedChapter === 'object' && exportedChapter.content_base64) {
+            const format = (args.format as string).toUpperCase();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `✅ **${format} Chapter Export Successful**\n\n` +
+                        `📖 **Chapter ID:** ${args.id}\n` +
+                        `📄 **File:** ${exportedChapter.filename}\n` +
+                        `📊 **Size:** ${(exportedChapter.size_bytes / 1024).toFixed(1)} KB\n` +
+                        `🔗 **Type:** ${exportedChapter.content_type}\n\n` +
+                        `**Full Base64 Content:**\n\`\`\`\n${exportedChapter.content_base64}\n\`\`\``
+                }
+              ]
+            };
+          }
+          
           return {
             content: [{
               type: "text",
