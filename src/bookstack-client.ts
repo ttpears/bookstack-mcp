@@ -42,6 +42,40 @@ export interface Chapter {
   owned_by: number;
 }
 
+export interface Shelf {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  owned_by: number;
+  books: Book[];
+  tags: Tag[];
+}
+
+export interface Tag {
+  name: string;
+  value: string;
+}
+
+export interface Attachment {
+  id: number;
+  name: string;
+  extension: string;
+  uploaded_to: number;
+  external: boolean;
+  order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: number;
+  updated_by: number;
+  links?: {
+    html: string;
+    markdown: string;
+  };
+}
+
 export interface SearchResult {
   type: string;
   id: number;
@@ -90,6 +124,10 @@ export class BookStackClient {
     return `${this.baseUrl}/books/${chapter.book_id}/chapter/${chapter.slug || chapter.id}`;
   }
 
+  private generateShelfUrl(shelf: Shelf): string {
+    return `${this.baseUrl}/shelves/${shelf.slug || shelf.id}`;
+  }
+
   private generateSearchUrl(query: string): string {
     const encodedQuery = encodeURIComponent(query);
     return `${this.baseUrl}/search?term=${encodedQuery}`;
@@ -120,6 +158,15 @@ export class BookStackClient {
     };
   }
 
+  private enhanceShelfResponse(shelf: Shelf): any {
+    return {
+      ...shelf,
+      url: this.generateShelfUrl(shelf),
+      direct_link: `[${shelf.name}](${this.generateShelfUrl(shelf)})`,
+      books: shelf.books?.map(book => this.enhanceBookResponse(book))
+    };
+  }
+
   private enhanceSearchResults(results: SearchResult[], originalQuery: string): any {
     return {
       search_query: originalQuery,
@@ -141,6 +188,7 @@ export class BookStackClient {
       case 'book':
         return `${this.baseUrl}/books/${result.slug || result.id}`;
       case 'bookshelf':
+      case 'shelf':
         return `${this.baseUrl}/shelves/${result.slug || result.id}`;
       default:
         return `${this.baseUrl}/link/${result.id}`;
@@ -346,5 +394,153 @@ export class BookStackClient {
         direct_link: `[${result.name}](${this.generateContentUrl(result)})`
       }))
     };
+  }
+
+  // Shelves (Book Collections) Management
+  async getShelves(options?: {
+    offset?: number;
+    count?: number;
+    sort?: string;
+    filter?: Record<string, any>;
+  }): Promise<ListResponse<Shelf>> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    
+    if (options?.sort) params.sort = options.sort;
+    if (options?.filter) params.filter = JSON.stringify(options.filter);
+    
+    const response = await this.client.get('/shelves', { params });
+    const data = response.data;
+    
+    return {
+      ...data,
+      data: data.data.map((shelf: Shelf) => this.enhanceShelfResponse(shelf))
+    };
+  }
+
+  async getShelf(id: number): Promise<any> {
+    const response = await this.client.get(`/shelves/${id}`);
+    return this.enhanceShelfResponse(response.data);
+  }
+
+  async createShelf(data: {
+    name: string;
+    description?: string;
+    books?: number[];
+    tags?: Tag[];
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.post('/shelves', data);
+    return this.enhanceShelfResponse(response.data);
+  }
+
+  async updateShelf(id: number, data: {
+    name?: string;
+    description?: string;
+    books?: number[];
+    tags?: Tag[];
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.put(`/shelves/${id}`, data);
+    return this.enhanceShelfResponse(response.data);
+  }
+
+  async deleteShelf(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/shelves/${id}`);
+    return response.data;
+  }
+
+  // Attachments Management
+  async getAttachments(options?: {
+    offset?: number;
+    count?: number;
+    sort?: string;
+    filter?: Record<string, any>;
+  }): Promise<ListResponse<Attachment>> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    
+    if (options?.sort) params.sort = options.sort;
+    if (options?.filter) params.filter = JSON.stringify(options.filter);
+    
+    const response = await this.client.get('/attachments', { params });
+    const data = response.data;
+    
+    return {
+      ...data,
+      data: data.data.map((attachment: Attachment) => ({
+        ...attachment,
+        page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
+        direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+      }))
+    };
+  }
+
+  async getAttachment(id: number): Promise<any> {
+    const response = await this.client.get(`/attachments/${id}`);
+    const attachment = response.data;
+    
+    return {
+      ...attachment,
+      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
+      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`,
+      download_url: `${this.baseUrl}/attachments/${attachment.id}`
+    };
+  }
+
+  async createAttachment(data: {
+    uploaded_to: number;
+    name: string;
+    link?: string;
+    // Note: File uploads would require multipart/form-data which is complex via this interface
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.post('/attachments', data);
+    const attachment = response.data;
+    
+    return {
+      ...attachment,
+      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
+      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+    };
+  }
+
+  async updateAttachment(id: number, data: {
+    name?: string;
+    link?: string;
+    uploaded_to?: number;
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.put(`/attachments/${id}`, data);
+    const attachment = response.data;
+    
+    return {
+      ...attachment,
+      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
+      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+    };
+  }
+
+  async deleteAttachment(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/attachments/${id}`);
+    return response.data;
   }
 }

@@ -247,6 +247,90 @@ export class BookStackTools {
             }
           }
         }
+      },
+      {
+        name: "get_shelves",
+        description: "List available book shelves (collections) with filtering and sorting. Use for 'show shelves', 'list collections', etc.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            offset: {
+              type: "number",
+              description: "Pagination offset (default: 0)",
+              default: 0
+            },
+            count: {
+              type: "number",
+              description: "Number of results to return (default: 50, max: 500)",
+              default: 50,
+              maximum: 500
+            },
+            sort: {
+              type: "string",
+              description: "Sort field (e.g., 'name', '-updated_at', 'created_at')"
+            },
+            filter: {
+              type: "object",
+              description: "Filter criteria"
+            }
+          }
+        }
+      },
+      {
+        name: "get_shelf",
+        description: "Get details of a specific book shelf (collection) including all books",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Shelf ID"
+            }
+          },
+          required: ["id"]
+        }
+      },
+      {
+        name: "get_attachments",
+        description: "List attachments (files and links) with filtering and sorting. Use for 'show attachments', 'list files', etc.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            offset: {
+              type: "number",
+              description: "Pagination offset (default: 0)",
+              default: 0
+            },
+            count: {
+              type: "number",
+              description: "Number of results to return (default: 50, max: 500)",
+              default: 50,
+              maximum: 500
+            },
+            sort: {
+              type: "string",
+              description: "Sort field (e.g., 'name', '-updated_at', 'created_at')"
+            },
+            filter: {
+              type: "object",
+              description: "Filter criteria (e.g., {'uploaded_to': 123, 'external': false})"
+            }
+          }
+        }
+      },
+      {
+        name: "get_attachment",
+        description: "Get details of a specific attachment including download links",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Attachment ID"
+            }
+          },
+          required: ["id"]
+        }
       }
     ];
 
@@ -306,6 +390,158 @@ export class BookStackTools {
           },
           required: ["id"]
         }
+      },
+      {
+        name: "create_shelf",
+        description: "Create a new book shelf (collection) to organize books",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Shelf name"
+            },
+            description: {
+              type: "string",
+              description: "Optional: Shelf description"
+            },
+            books: {
+              type: "array",
+              items: {
+                type: "number"
+              },
+              description: "Optional: Array of book IDs to add to the shelf"
+            },
+            tags: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  value: { type: "string" }
+                }
+              },
+              description: "Optional: Tags for the shelf"
+            }
+          },
+          required: ["name"]
+        }
+      },
+      {
+        name: "update_shelf",
+        description: "Update an existing book shelf (collection)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Shelf ID"
+            },
+            name: {
+              type: "string",
+              description: "Optional: New shelf name"
+            },
+            description: {
+              type: "string",
+              description: "Optional: New shelf description"
+            },
+            books: {
+              type: "array",
+              items: {
+                type: "number"
+              },
+              description: "Optional: Array of book IDs for the shelf"
+            },
+            tags: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  value: { type: "string" }
+                }
+              },
+              description: "Optional: Tags for the shelf"
+            }
+          },
+          required: ["id"]
+        }
+      },
+      {
+        name: "delete_shelf",
+        description: "Delete a book shelf (collection)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Shelf ID"
+            }
+          },
+          required: ["id"]
+        }
+      },
+      {
+        name: "create_attachment",
+        description: "Create a new attachment (link attachment) to a page",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Attachment name"
+            },
+            uploaded_to: {
+              type: "number",
+              description: "Page ID where attachment will be attached"
+            },
+            link: {
+              type: "string",
+              description: "URL for link attachments"
+            }
+          },
+          required: ["name", "uploaded_to", "link"]
+        }
+      },
+      {
+        name: "update_attachment",
+        description: "Update an existing attachment",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Attachment ID"
+            },
+            name: {
+              type: "string",
+              description: "Optional: New attachment name"
+            },
+            link: {
+              type: "string",
+              description: "Optional: New URL for link attachments"
+            },
+            uploaded_to: {
+              type: "number",
+              description: "Optional: Move attachment to different page"
+            }
+          },
+          required: ["id"]
+        }
+      },
+      {
+        name: "delete_attachment",
+        description: "Delete an attachment",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Attachment ID"
+            }
+          },
+          required: ["id"]
+        }
       }
     ];
 
@@ -339,11 +575,21 @@ export class BookStackTools {
                 "get_page - Get full content of a specific page",
                 "get_chapters - List chapters with filtering options",
                 "get_chapter - Get details of a specific chapter",
+                "get_shelves - List book shelves (collections) for organizing books",
+                "get_shelf - Get details of a specific shelf including all books",
+                "get_attachments - List attachments (files and links) with filtering",
+                "get_attachment - Get attachment details including download links",
                 "export_page - Export pages in multiple formats (HTML, PDF, Markdown, Plain text)"
               ],
               write_operations: this.enableWrite ? [
                 "create_page - Create new pages in BookStack",
-                "update_page - Update existing pages"
+                "update_page - Update existing pages",
+                "create_shelf - Create new book shelves (collections)",
+                "update_shelf - Update existing shelves and their book assignments",
+                "delete_shelf - Delete book shelves",
+                "create_attachment - Create new link attachments to pages",
+                "update_attachment - Update existing attachments",
+                "delete_attachment - Delete attachments"
               ] : [
                 "❌ DISABLED - Write operations are currently disabled",
                 "ℹ️  To enable: Set BOOKSTACK_ENABLE_WRITE=true in environment variables"
@@ -514,6 +760,124 @@ export class BookStackTools {
             content: [{
               type: "text",
               text: JSON.stringify(recentChanges, null, 2)
+            }]
+          };
+
+        case "get_shelves":
+          const shelves = await this.client.getShelves({
+            offset: args.offset as number,
+            count: args.count as number,
+            sort: args.sort as string,
+            filter: args.filter as Record<string, any>
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(shelves, null, 2)
+            }]
+          };
+
+        case "get_shelf":
+          const shelf = await this.client.getShelf(args.id as number);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(shelf, null, 2)
+            }]
+          };
+
+        case "create_shelf":
+          const newShelf = await this.client.createShelf({
+            name: args.name as string,
+            description: args.description as string,
+            books: args.books as number[],
+            tags: args.tags as any[]
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(newShelf, null, 2)
+            }]
+          };
+
+        case "update_shelf":
+          const updatedShelf = await this.client.updateShelf(args.id as number, {
+            name: args.name as string,
+            description: args.description as string,
+            books: args.books as number[],
+            tags: args.tags as any[]
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(updatedShelf, null, 2)
+            }]
+          };
+
+        case "delete_shelf":
+          const deleteResult = await this.client.deleteShelf(args.id as number);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(deleteResult, null, 2)
+            }]
+          };
+
+        case "get_attachments":
+          const attachments = await this.client.getAttachments({
+            offset: args.offset as number,
+            count: args.count as number,
+            sort: args.sort as string,
+            filter: args.filter as Record<string, any>
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(attachments, null, 2)
+            }]
+          };
+
+        case "get_attachment":
+          const attachment = await this.client.getAttachment(args.id as number);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(attachment, null, 2)
+            }]
+          };
+
+        case "create_attachment":
+          const newAttachment = await this.client.createAttachment({
+            name: args.name as string,
+            uploaded_to: args.uploaded_to as number,
+            link: args.link as string
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(newAttachment, null, 2)
+            }]
+          };
+
+        case "update_attachment":
+          const updatedAttachment = await this.client.updateAttachment(args.id as number, {
+            name: args.name as string,
+            link: args.link as string,
+            uploaded_to: args.uploaded_to as number
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(updatedAttachment, null, 2)
+            }]
+          };
+
+        case "delete_attachment":
+          const deleteAttachmentResult = await this.client.deleteAttachment(args.id as number);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(deleteAttachmentResult, null, 2)
             }]
           };
 
