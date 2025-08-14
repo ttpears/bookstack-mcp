@@ -392,10 +392,15 @@ export class BookStackClient {
 
   async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
     try {
-      // For binary formats (PDF, ZIP), return BookStack direct URL
+      // For binary formats (PDF, ZIP), return BookStack web URL using slugs
       if (format === 'pdf' || format === 'zip') {
-        const directUrl = `${this.baseUrl}/pages/${id}/export/${format}`;
-        const filename = `page-${id}.${format}`;
+        // First fetch the page data to get slugs
+        const page = await this.getPage(id);
+        const book = await this.getBook(page.book_id);
+        
+        // Construct the correct web URL with slugs
+        const directUrl = `${this.baseUrl}/books/${book.slug}/page/${page.slug}/export/${format}`;
+        const filename = `${page.slug}.${format}`;
         const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
         
         return {
@@ -405,11 +410,13 @@ export class BookStackClient {
           content_type: contentType,
           export_success: true,
           page_id: id,
+          page_name: page.name,
+          book_name: book.name,
           direct_download: true,
-          note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
+          note: "This is a direct link to BookStack's web export. You may need to be logged in to BookStack to access it."
         };
       } else {
-        // For text formats, fetch the content
+        // For text formats, fetch the content via API
         console.error(`Exporting page ${id} as ${format}...`);
         const response = await this.client.get(`/pages/${id}/export/${format}`);
         console.error(`Export response status: ${response.status}`);
@@ -429,10 +436,14 @@ export class BookStackClient {
   }
 
   async exportBook(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
-    // For binary formats (PDF, ZIP), return BookStack direct URL
+    // For binary formats (PDF, ZIP), return BookStack web URL using slug
     if (format === 'pdf' || format === 'zip') {
-      const directUrl = `${this.baseUrl}/books/${id}/export/${format}`;
-      const filename = `book-${id}.${format}`;
+      // First fetch the book data to get slug
+      const book = await this.getBook(id);
+      
+      // Construct the correct web URL with slug
+      const directUrl = `${this.baseUrl}/books/${book.slug}/export/${format}`;
+      const filename = `${book.slug}.${format}`;
       const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
       
       return {
@@ -442,21 +453,27 @@ export class BookStackClient {
         content_type: contentType,
         export_success: true,
         book_id: id,
+        book_name: book.name,
         direct_download: true,
-        note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
+        note: "This is a direct link to BookStack's web export. You may need to be logged in to BookStack to access it."
       };
     }
     
-    // For text formats, fetch the content
+    // For text formats, fetch the content via API
     const response = await this.client.get(`/books/${id}/export/${format}`);
     return response.data;
   }
 
   async exportChapter(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
-    // For binary formats (PDF, ZIP), return BookStack direct URL
+    // For binary formats (PDF, ZIP), return BookStack web URL using slugs
     if (format === 'pdf' || format === 'zip') {
-      const directUrl = `${this.baseUrl}/chapters/${id}/export/${format}`;
-      const filename = `chapter-${id}.${format}`;
+      // First fetch the chapter data to get slugs
+      const chapter = await this.getChapter(id);
+      const book = await this.getBook(chapter.book_id);
+      
+      // Construct the correct web URL with both book and chapter slugs
+      const directUrl = `${this.baseUrl}/books/${book.slug}/chapter/${chapter.slug}/export/${format}`;
+      const filename = `${chapter.slug}.${format}`;
       const contentType = format === 'pdf' ? 'application/pdf' : 'application/zip';
       
       return {
@@ -466,12 +483,14 @@ export class BookStackClient {
         content_type: contentType,
         export_success: true,
         chapter_id: id,
+        chapter_name: chapter.name,
+        book_name: book.name,
         direct_download: true,
-        note: "This is a direct link to BookStack's export. You may need to be logged in to BookStack to access it."
+        note: "This is a direct link to BookStack's web export. You may need to be logged in to BookStack to access it."
       };
     }
     
-    // For text formats, fetch the content
+    // For text formats, fetch the content via API
     const response = await this.client.get(`/chapters/${id}/export/${format}`);
     return response.data;
   }

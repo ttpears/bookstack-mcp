@@ -806,7 +806,9 @@ export class BookStackTools {
                 {
                   type: "text",
                   text: `✅ **${format} Export Ready**\n\n` +
-                        `📄 **File:** ${exportedContent.filename}\n` +
+                        `📄 **Page:** ${exportedContent.page_name}\n` +
+                        `📚 **Book:** ${exportedContent.book_name}\n` +
+                        `📁 **File:** ${exportedContent.filename}\n` +
                         `🔗 **Type:** ${exportedContent.content_type}\n\n` +
                         `🚀 **Direct Download Link:**\n` +
                         `${exportedContent.download_url}\n\n` +
@@ -842,8 +844,8 @@ export class BookStackTools {
                 {
                   type: "text",
                   text: `✅ **${format} Book Export Ready**\n\n` +
-                        `📚 **Book ID:** ${args.id}\n` +
-                        `📄 **File:** ${exportedBook.filename}\n` +
+                        `📚 **Book:** ${exportedBook.book_name}\n` +
+                        `📁 **File:** ${exportedBook.filename}\n` +
                         `🔗 **Type:** ${exportedBook.content_type}\n\n` +
                         `🚀 **Direct Download Link:**\n` +
                         `${exportedBook.download_url}\n\n` +
@@ -872,8 +874,9 @@ export class BookStackTools {
                 {
                   type: "text",
                   text: `✅ **${format} Chapter Export Ready**\n\n` +
-                        `📖 **Chapter ID:** ${args.id}\n` +
-                        `📄 **File:** ${exportedChapter.filename}\n` +
+                        `📖 **Chapter:** ${exportedChapter.chapter_name}\n` +
+                        `📚 **Book:** ${exportedChapter.book_name}\n` +
+                        `📁 **File:** ${exportedChapter.filename}\n` +
                         `🔗 **Type:** ${exportedChapter.content_type}\n\n` +
                         `🚀 **Direct Download Link:**\n` +
                         `${exportedChapter.download_url}\n\n` +
