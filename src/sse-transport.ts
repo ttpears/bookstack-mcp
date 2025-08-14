@@ -1,6 +1,7 @@
 import express from 'express';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { BookStackTools } from "./bookstack-tools.js";
 
 export class SSETransportServer {
@@ -50,13 +51,13 @@ export class SSETransportServer {
           }
         );
 
-        server.setRequestHandler("tools/list", async () => {
+        server.setRequestHandler(ListToolsRequestSchema, async () => {
           return {
             tools: this.bookStackTools.getTools()
           };
         });
 
-        server.setRequestHandler("tools/call", async (request) => {
+        server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return await this.bookStackTools.handleToolCall(request);
         });
 

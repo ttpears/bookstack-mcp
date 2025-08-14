@@ -1,6 +1,6 @@
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
+  CallToolRequest,
+  ListToolsRequest,
   Tool
 } from "@modelcontextprotocol/sdk/types.js";
 import { BookStackClient } from "./bookstack-client.js";
@@ -214,13 +214,17 @@ export class BookStackTools {
     ];
   }
 
-  async handleToolCall(request: CallToolRequestSchema): Promise<any> {
+  async handleToolCall(request: CallToolRequest): Promise<any> {
     const { name, arguments: args } = request.params;
+
+    if (!args) {
+      throw new Error("Missing arguments in tool call");
+    }
 
     try {
       switch (name) {
         case "search_content":
-          const searchResults = await this.client.searchContent(args.query, args.type);
+          const searchResults = await this.client.searchContent(args.query as string, args.type as string);
           return {
             content: [{
               type: "text",
@@ -229,7 +233,7 @@ export class BookStackTools {
           };
 
         case "get_books":
-          const books = await this.client.getBooks(args.offset, args.count);
+          const books = await this.client.getBooks(args.offset as number, args.count as number);
           return {
             content: [{
               type: "text",
@@ -238,7 +242,7 @@ export class BookStackTools {
           };
 
         case "get_book":
-          const book = await this.client.getBook(args.id);
+          const book = await this.client.getBook(args.id as number);
           return {
             content: [{
               type: "text",
@@ -247,7 +251,7 @@ export class BookStackTools {
           };
 
         case "get_pages":
-          const pages = await this.client.getPages(args.book_id, args.offset, args.count);
+          const pages = await this.client.getPages(args.book_id as number, args.offset as number, args.count as number);
           return {
             content: [{
               type: "text",
@@ -256,7 +260,7 @@ export class BookStackTools {
           };
 
         case "get_page":
-          const page = await this.client.getPage(args.id);
+          const page = await this.client.getPage(args.id as number);
           return {
             content: [{
               type: "text",
@@ -265,7 +269,7 @@ export class BookStackTools {
           };
 
         case "get_chapters":
-          const chapters = await this.client.getChapters(args.book_id, args.offset, args.count);
+          const chapters = await this.client.getChapters(args.book_id as number, args.offset as number, args.count as number);
           return {
             content: [{
               type: "text",
@@ -274,7 +278,7 @@ export class BookStackTools {
           };
 
         case "get_chapter":
-          const chapter = await this.client.getChapter(args.id);
+          const chapter = await this.client.getChapter(args.id as number);
           return {
             content: [{
               type: "text",
@@ -284,11 +288,11 @@ export class BookStackTools {
 
         case "create_page":
           const newPage = await this.client.createPage({
-            name: args.name,
-            book_id: args.book_id,
-            chapter_id: args.chapter_id,
-            html: args.html,
-            markdown: args.markdown
+            name: args.name as string,
+            book_id: args.book_id as number,
+            chapter_id: args.chapter_id as number,
+            html: args.html as string,
+            markdown: args.markdown as string
           });
           return {
             content: [{
@@ -298,10 +302,10 @@ export class BookStackTools {
           };
 
         case "update_page":
-          const updatedPage = await this.client.updatePage(args.id, {
-            name: args.name,
-            html: args.html,
-            markdown: args.markdown
+          const updatedPage = await this.client.updatePage(args.id as number, {
+            name: args.name as string,
+            html: args.html as string,
+            markdown: args.markdown as string
           });
           return {
             content: [{
@@ -311,7 +315,7 @@ export class BookStackTools {
           };
 
         case "export_page":
-          const exportedContent = await this.client.exportPage(args.id, args.format);
+          const exportedContent = await this.client.exportPage(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext");
           return {
             content: [{
               type: "text",

@@ -13,8 +13,8 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 RUN npm run build
 
-# Remove dev dependencies after build
-RUN npm ci --only=production && npm cache clean --force
+# Remove dev dependencies and clean cache
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \

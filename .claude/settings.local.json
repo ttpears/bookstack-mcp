@@ -4,7 +4,9 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:demo.bookstackapp.com)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npm run build:*)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": [],

@@ -2,6 +2,7 @@
   "name": "bookstack-mcp",
   "version": "1.0.0",
   "description": "BookStack MCP server with SSE support for LibreChat",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
