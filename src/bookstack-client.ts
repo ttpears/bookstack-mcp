@@ -305,4 +305,46 @@ export class BookStackClient {
     const response = await this.client.get(`/pages/${id}/export/${format}`);
     return response.data;
   }
+
+  async getRecentChanges(options?: {
+    type?: 'all' | 'page' | 'book' | 'chapter';
+    limit?: number;
+    days?: number;
+  }): Promise<any> {
+    const limit = Math.min(options?.limit || 20, 100);
+    const days = options?.days || 30;
+    const type = options?.type || 'all';
+    
+    // Calculate date threshold
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - days);
+    const dateFilter = dateThreshold.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Build search query for recent changes
+    let searchQuery = `{updated_at:>=${dateFilter}}`;
+    if (type !== 'all') {
+      searchQuery = `{type:${type}} ${searchQuery}`;
+    }
+    
+    const params = {
+      query: searchQuery,
+      count: limit,
+      sort: 'updated_at' // Sort by most recently updated
+    };
+    
+    const response = await this.client.get('/search', { params });
+    const results = response.data.data || response.data;
+    
+    return {
+      search_query: `Recent changes in the last ${days} days (${type})`,
+      date_threshold: dateFilter,
+      search_url: this.generateSearchUrl(searchQuery),
+      total_found: results.length,
+      results: results.map((result: SearchResult) => ({
+        ...result,
+        url: this.generateContentUrl(result),
+        direct_link: `[${result.name}](${this.generateContentUrl(result)})`
+      }))
+    };
+  }
 }

@@ -21,7 +21,7 @@ export class BookStackTools {
       },
       {
         name: "search_content",
-        description: "Search across BookStack content with advanced filtering",
+        description: "Search across BookStack content with advanced filtering. Use for queries like 'latest changes', 'recent updates', 'find content', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -76,7 +76,7 @@ export class BookStackTools {
       },
       {
         name: "get_books",
-        description: "List available books with advanced filtering and sorting",
+        description: "List available books with advanced filtering and sorting. Use for 'show books', 'list books', 'get all books', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -118,7 +118,7 @@ export class BookStackTools {
       },
       {
         name: "get_pages",
-        description: "List pages with advanced filtering by book, chapter, and custom criteria",
+        description: "List pages with advanced filtering by book, chapter, and custom criteria. Use for 'show pages', 'latest pages', 'recent pages', 'get pages from book', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -168,7 +168,7 @@ export class BookStackTools {
       },
       {
         name: "get_chapters",
-        description: "List chapters, optionally filtered by book",
+        description: "List chapters, optionally filtered by book. Use for 'show chapters', 'list chapters', 'get chapters from book', etc.",
         inputSchema: {
           type: "object",
           properties: {
@@ -220,6 +220,32 @@ export class BookStackTools {
             }
           },
           required: ["id", "format"]
+        }
+      },
+      {
+        name: "get_recent_changes",
+        description: "Get recently updated content from BookStack. Perfect for 'latest changes', 'recent updates', 'what's new', etc.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            type: {
+              type: "string",
+              enum: ["all", "page", "book", "chapter"],
+              description: "Filter by content type (default: all)",
+              default: "all"
+            },
+            limit: {
+              type: "number",
+              description: "Number of recent items to return (default: 20, max: 100)",
+              default: 20,
+              maximum: 100
+            },
+            days: {
+              type: "number",
+              description: "Number of days back to look for changes (default: 30)",
+              default: 30
+            }
+          }
         }
       }
     ];
@@ -306,6 +332,7 @@ export class BookStackTools {
                 "get_capabilities - Show this capability information",
                 "search_content - Advanced search with filtering and BookStack syntax",
                 "search_pages - Search specifically for pages with book filtering",
+                "get_recent_changes - Get recently updated content (perfect for 'latest changes')",
                 "get_books - List books with filtering, sorting, and pagination",
                 "get_book - Get detailed information about a specific book", 
                 "get_pages - List pages with advanced filtering options",
@@ -328,6 +355,13 @@ export class BookStackTools {
               "Pagination support up to 500 results per request", 
               "Multi-criteria filtering and custom sorting",
               "Export capabilities in multiple formats"
+            ],
+            natural_language_examples: [
+              "Say 'Get the latest changes from bookstack' to search recent content",
+              "Say 'Show me recent pages' to list recently updated pages",
+              "Say 'What books are available?' to get the book list",
+              "Say 'Find pages about authentication' to search content",
+              "Say 'Show chapters in the user guide' to list specific chapters"
             ],
             security_note: this.enableWrite 
               ? "⚠️  Write operations are ENABLED - AI can create and modify BookStack content"
@@ -467,6 +501,19 @@ export class BookStackTools {
             content: [{
               type: "text",
               text: exportedContent
+            }]
+          };
+
+        case "get_recent_changes":
+          const recentChanges = await this.client.getRecentChanges({
+            type: args.type as "all" | "page" | "book" | "chapter",
+            limit: args.limit as number,
+            days: args.days as number
+          });
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(recentChanges, null, 2)
             }]
           };
 
