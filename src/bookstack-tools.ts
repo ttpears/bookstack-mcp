@@ -215,8 +215,46 @@ export class BookStackTools {
             },
             format: {
               type: "string",
-              enum: ["html", "pdf", "markdown", "plaintext"],
-              description: "Export format"
+              enum: ["html", "pdf", "markdown", "plaintext", "zip"],
+              description: "Export format (pdf and zip return base64-encoded binary data)"
+            }
+          },
+          required: ["id", "format"]
+        }
+      },
+      {
+        name: "export_book",
+        description: "Export a book in various formats including PDF with proper binary handling",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Book ID"
+            },
+            format: {
+              type: "string",
+              enum: ["html", "pdf", "markdown", "plaintext", "zip"],
+              description: "Export format (pdf and zip return base64-encoded binary data)"
+            }
+          },
+          required: ["id", "format"]
+        }
+      },
+      {
+        name: "export_chapter",
+        description: "Export a chapter in various formats including PDF with proper binary handling",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "number",
+              description: "Chapter ID"
+            },
+            format: {
+              type: "string",
+              enum: ["html", "pdf", "markdown", "plaintext", "zip"],
+              description: "Export format (pdf and zip return base64-encoded binary data)"
             }
           },
           required: ["id", "format"]
@@ -579,7 +617,9 @@ export class BookStackTools {
                 "get_shelf - Get details of a specific shelf including all books",
                 "get_attachments - List attachments (files and links) with filtering",
                 "get_attachment - Get attachment details including download links",
-                "export_page - Export pages in multiple formats (HTML, PDF, Markdown, Plain text)"
+                "export_page - Export pages in multiple formats with proper binary handling",
+                "export_book - Export entire books in multiple formats with proper binary handling",
+                "export_chapter - Export chapters in multiple formats with proper binary handling"
               ],
               write_operations: this.enableWrite ? [
                 "create_page - Create new pages in BookStack",
@@ -750,11 +790,29 @@ export class BookStackTools {
           };
 
         case "export_page":
-          const exportedContent = await this.client.exportPage(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext");
+          const exportedContent = await this.client.exportPage(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
           return {
             content: [{
               type: "text",
-              text: exportedContent
+              text: typeof exportedContent === 'string' ? exportedContent : JSON.stringify(exportedContent, null, 2)
+            }]
+          };
+
+        case "export_book":
+          const exportedBook = await this.client.exportBook(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
+          return {
+            content: [{
+              type: "text",
+              text: typeof exportedBook === 'string' ? exportedBook : JSON.stringify(exportedBook, null, 2)
+            }]
+          };
+
+        case "export_chapter":
+          const exportedChapter = await this.client.exportChapter(args.id as number, args.format as "html" | "pdf" | "markdown" | "plaintext" | "zip");
+          return {
+            content: [{
+              type: "text",
+              text: typeof exportedChapter === 'string' ? exportedChapter : JSON.stringify(exportedChapter, null, 2)
             }]
           };
 

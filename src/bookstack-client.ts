@@ -390,8 +390,84 @@ export class BookStackClient {
     return this.enhancePageResponse(response.data);
   }
 
-  async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext'): Promise<string> {
-    const response = await this.client.get(`/pages/${id}/export/${format}`);
+  async exportPage(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
+    const config: any = {};
+    
+    // For binary formats (PDF, ZIP), we need to handle them differently
+    if (format === 'pdf' || format === 'zip') {
+      config.responseType = 'arraybuffer';
+    }
+    
+    const response = await this.client.get(`/pages/${id}/export/${format}`, config);
+    
+    // For binary formats, return base64 encoded data with metadata
+    if (format === 'pdf' || format === 'zip') {
+      const buffer = Buffer.from(response.data);
+      return {
+        format: format,
+        filename: `page-${id}.${format}`,
+        size_bytes: buffer.length,
+        content_base64: buffer.toString('base64'),
+        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
+        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
+      };
+    }
+    
+    // For text formats, return as string
+    return response.data;
+  }
+
+  async exportBook(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
+    const config: any = {};
+    
+    // For binary formats (PDF, ZIP), we need to handle them differently
+    if (format === 'pdf' || format === 'zip') {
+      config.responseType = 'arraybuffer';
+    }
+    
+    const response = await this.client.get(`/books/${id}/export/${format}`, config);
+    
+    // For binary formats, return base64 encoded data with metadata
+    if (format === 'pdf' || format === 'zip') {
+      const buffer = Buffer.from(response.data);
+      return {
+        format: format,
+        filename: `book-${id}.${format}`,
+        size_bytes: buffer.length,
+        content_base64: buffer.toString('base64'),
+        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
+        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
+      };
+    }
+    
+    // For text formats, return as string
+    return response.data;
+  }
+
+  async exportChapter(id: number, format: 'html' | 'pdf' | 'markdown' | 'plaintext' | 'zip'): Promise<any> {
+    const config: any = {};
+    
+    // For binary formats (PDF, ZIP), we need to handle them differently
+    if (format === 'pdf' || format === 'zip') {
+      config.responseType = 'arraybuffer';
+    }
+    
+    const response = await this.client.get(`/chapters/${id}/export/${format}`, config);
+    
+    // For binary formats, return base64 encoded data with metadata
+    if (format === 'pdf' || format === 'zip') {
+      const buffer = Buffer.from(response.data);
+      return {
+        format: format,
+        filename: `chapter-${id}.${format}`,
+        size_bytes: buffer.length,
+        content_base64: buffer.toString('base64'),
+        download_note: 'Binary content encoded as base64. Save and decode to access the file.',
+        content_type: format === 'pdf' ? 'application/pdf' : 'application/zip'
+      };
+    }
+    
+    // For text formats, return as string
     return response.data;
   }
 
