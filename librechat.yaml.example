@@ -1,0 +1,7 @@
+# LibreChat Configuration - Add this to your librechat.yaml
+
+# MCP Servers Configuration
+mcpServers:
+  bookstack-mcp:
+    type: sse
+    url: http://bookstack-mcp:8007/sse
