@@ -70,25 +70,24 @@ cp .env.example .env
 
 ### Option 2: LibreChat Integration
 
-To integrate with LibreChat, follow these steps (no cloning required):
+This method requires the `Dockerfile.mcp-bookstack` file in your LibreChat directory:
 
 ```bash
-# 1. Add environment variables to your LibreChat .env file
+# 1. Copy Dockerfile.mcp-bookstack to your LibreChat root directory
+# Download from: https://github.com/ttpears/bookstack-mcp/blob/main/Dockerfile.mcp-bookstack
+
+# 2. Add environment variables to your LibreChat .env file
 echo "BOOKSTACK_BASE_URL=https://your-bookstack.com" >> .env
 echo "BOOKSTACK_TOKEN_ID=your-token-id" >> .env
 echo "BOOKSTACK_TOKEN_SECRET=your-token-secret" >> .env
 
-# 2. Add the service to your docker-compose.override.yml
-# Copy the content from docker-compose.override.yml.example
-
-# 3. Add MCP configuration to your librechat.yaml
-# Copy the content from librechat.yaml.example
-
-# 4. Restart LibreChat
+# 3. Update docker-compose.override.yml with the service configuration
+# 4. Add MCP configuration to your librechat.yaml
+# 5. Restart LibreChat
 docker compose down && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
-**Important:** The LibreChat integration is completely self-contained. The `Dockerfile.mcp-bookstack` automatically clones the repository, builds the project, and configures supergateway. You don't need to clone anything locally.
+**Important:** The `Dockerfile.mcp-bookstack` is self-contained and automatically clones the repository, builds the project, and configures supergateway during the Docker build process.
 
 ## Configuration
 
@@ -147,23 +146,15 @@ Add this service to your LibreChat `docker-compose.override.yml`:
 services:
   bookstack-mcp:
     build:
-      context: https://github.com/ttpears/bookstack-mcp.git
+      context: .
       dockerfile: Dockerfile.mcp-bookstack
-    environment:
-      - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
-      - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
-      - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
+    env_file:
+      - .env
     ports:
       - "8007:8007"
-    restart: unless-stopped
     networks:
-      - default
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - librechat
+    restart: unless-stopped
 ```
 
 **Note:** The LibreChat integration uses `Dockerfile.mcp-bookstack` which:
