@@ -27,17 +27,30 @@ The LibreChat integration uses the stdio version with supergateway to bridge to 
 1. **get_capabilities** - Show current server capabilities and available tools
 2. **search_content** - Advanced search with filtering, pagination, and BookStack search syntax
 3. **search_pages** - Search specifically for pages with optional book filtering  
-4. **get_books** - List books with advanced filtering, sorting, and pagination
-5. **get_book** - Get detailed information about a specific book
-6. **get_pages** - List pages with filtering by book, chapter, custom criteria, and sorting
-7. **get_page** - Get full content of a specific page
-8. **get_chapters** - List chapters with advanced filtering options
-9. **get_chapter** - Get details of a specific chapter
-10. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text)
+4. **get_recent_changes** - Get recently updated content with contextual previews
+5. **get_books** - List books with advanced filtering, sorting, and pagination
+6. **get_book** - Get detailed information about a specific book
+7. **get_pages** - List pages with filtering by book, chapter, custom criteria, and sorting
+8. **get_page** - Get full content of a specific page
+9. **get_chapters** - List chapters with advanced filtering options
+10. **get_chapter** - Get details of a specific chapter
+11. **get_shelves** - List book shelves (collections) with filtering and sorting
+12. **get_shelf** - Get details of a specific shelf including all books
+13. **get_attachments** - List attachments (files and links) with filtering
+14. **get_attachment** - Get details of a specific attachment
+15. **export_page** - Export pages in various formats (HTML, PDF, Markdown, Plain text, ZIP)
+16. **export_book** - Export books in various formats
+17. **export_chapter** - Export chapters in various formats
 
 ### Write Operations (Requires BOOKSTACK_ENABLE_WRITE=true)
-11. **create_page** - Create new pages in BookStack
-12. **update_page** - Update existing pages
+18. **create_page** - Create new pages in BookStack
+19. **update_page** - Update existing pages
+20. **create_shelf** - Create new book shelves
+21. **update_shelf** - Update existing shelves
+22. **delete_shelf** - Delete book shelves
+23. **create_attachment** - Create new attachments
+24. **update_attachment** - Update existing attachments
+25. **delete_attachment** - Delete attachments
 
 **Security Note:** Write operations are disabled by default. Set `BOOKSTACK_ENABLE_WRITE=true` to enable page creation and updates.
 
@@ -98,6 +111,27 @@ docker compose down && docker compose -f docker-compose.yml -f docker-compose.ov
 ```
 
 **Important:** The `Dockerfile.mcp-bookstack` is self-contained and automatically clones the repository, builds the project, and configures supergateway during the Docker build process.
+
+## Troubleshooting
+
+### Common Issues
+
+1.  **Connection Refused**: Ensure the `BOOKSTACK_BASE_URL` is reachable from the container. If running locally, use `host.docker.internal` instead of `localhost`.
+2.  **Authentication Failed**: Double-check your `BOOKSTACK_TOKEN_ID` and `BOOKSTACK_TOKEN_SECRET`. Ensure the user has appropriate permissions in BookStack.
+3.  **Write Operations Failing**: Verify that `BOOKSTACK_ENABLE_WRITE` is set to `true` in your environment variables.
+4.  **Empty Responses**: Check if your BookStack instance has content. The search tools rely on BookStack's search index, which might need rebuilding (`php artisan bookstack:regenerate-search`).
+
+### Logs
+
+To view logs for the standalone Docker deployment:
+```bash
+docker compose logs -f
+```
+
+For LibreChat integration, check the specific service logs:
+```bash
+docker compose logs -f bookstack-mcp
+```
 
 ## Configuration
 

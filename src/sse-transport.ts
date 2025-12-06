@@ -27,6 +27,10 @@ export class SSETransportServer {
       next();
     });
 
+    this.app.get("/health", (req, res) => {
+      res.status(200).send("OK");
+    });
+
     this.app.get("/sse", async (req, res) => {
       try {
         console.log("New SSE connection request");

@@ -1,10 +1,6 @@
-version: '3.8'
-
 services:
   bookstack-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/codyssey-ltd/bookstack-mcp:latest
     ports:
       - "8007:8007"
     environment:

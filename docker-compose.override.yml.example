@@ -8,9 +8,7 @@
 
 services:
   bookstack-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile.mcp-bookstack
+    image: ghcr.io/codyssey-ltd/bookstack-mcp:latest
     env_file:
       - .env
     ports:
