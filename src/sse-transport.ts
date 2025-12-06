@@ -15,11 +15,13 @@ export class SSETransportServer {
   }
 
   private setupRoutes() {
-    this.app.use(express.json());
+    // Remove global express.json() middleware as handlePostMessage handles the stream
+    // this.app.use(express.json()); 
+    
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-id');
       if (req.method === 'OPTIONS') {
         res.sendStatus(200);
         return;
@@ -35,14 +37,6 @@ export class SSETransportServer {
       try {
         console.log("New SSE connection request");
         
-        const sessionId = req.query.sessionId as string;
-        
-        if (sessionId && this.transports.has(sessionId)) {
-          console.log(`Session ${sessionId} already exists, closing connection`);
-          res.status(409).send("Session already exists");
-          return;
-        }
-
         const server = new Server(
           {
             name: "bookstack-mcp",
@@ -86,12 +80,12 @@ export class SSETransportServer {
       }
     });
 
-    this.app.post("/message", express.json(), async (req, res) => {
+    this.app.post("/message", async (req, res) => {
       try {
-        const sessionId = req.headers['x-session-id'] as string;
+        const sessionId = (req.query.sessionId as string) || (req.headers['x-session-id'] as string);
         
         if (!sessionId) {
-          res.status(400).send("Missing session ID header");
+          res.status(400).send("Missing session ID");
           return;
         }
 
@@ -101,24 +95,18 @@ export class SSETransportServer {
           return;
         }
 
-        await transport.handleMessage(req.body);
-        res.sendStatus(200);
+        // Use handlePostMessage to handle the request/response cycle
+        await transport.handlePostMessage(req, res);
 
       } catch (error) {
         console.error("Error in message endpoint:", error);
-        res.status(500).send("Internal server error");
+        if (!res.headersSent) {
+          res.status(500).send("Internal server error");
+        }
       }
     });
-
-
-    this.app.get("/health", (req, res) => {
-      res.json({
-        status: "healthy",
-        timestamp: new Date().toISOString(),
-        activeSessions: this.transports.size
-      });
-    });
   }
+
 
   start(port: number = 8007): void {
     this.app.listen(port, () => {

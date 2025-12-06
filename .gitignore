@@ -111,6 +111,19 @@ pids
 *.swo
 *~
 
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Development/Debug files
+debug_*.sh
+debug_*.ipynb
+LOCAL_SETUP.sh
+docker-compose.local.yml
+*.local.yml
+
 # OS generated files
 .DS_Store
 .DS_Store?

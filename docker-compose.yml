@@ -3,11 +3,8 @@ services:
     image: ghcr.io/codyssey-ltd/bookstack-mcp:latest
     ports:
       - "8007:8007"
-    environment:
-      - BOOKSTACK_BASE_URL=${BOOKSTACK_BASE_URL}
-      - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
-      - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
-      - PORT=8007
+    env_file:
+      - .env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
