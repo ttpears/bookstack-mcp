@@ -641,6 +641,4 @@ async function main() {
   console.error("BookStack MCP server running on stdio");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
-}
+main().catch(console.error);
