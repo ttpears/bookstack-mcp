@@ -180,13 +180,20 @@ async function main() {
     "get_page",
     {
       title: "Get Page Content",
-      description: "Get full content of a specific page",
+      description: "Get content of a specific page. Returns one content format (default markdown) and supports character-range pagination so large pages don't blow the context window. Use offset/limit or the returned content_next_offset to page through long content.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Page ID")
+        id: z.coerce.number().min(1).describe("Page ID"),
+        format: z.enum(["markdown", "html", "text"]).optional().describe("Which content format to return. Defaults to markdown."),
+        offset: z.coerce.number().min(0).optional().describe("Character offset into the content to start from (default 0)"),
+        limit: z.coerce.number().min(1).max(200000).optional().describe("Max characters of content to return (default 50000)")
       }
     },
     async (args) => {
-      const page = await client.getPage(args.id);
+      const page = await client.getPage(args.id, {
+        format: args.format,
+        offset: args.offset,
+        limit: args.limit
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(page, null, 2) }]
       };

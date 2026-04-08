@@ -171,22 +171,51 @@ export class BookStackClient {
     };
   }
 
-  private async enhancePageResponse(page: Page): Promise<any> {
+  private async enhancePageResponse(page: Page, options?: {
+    format?: 'markdown' | 'html' | 'text';
+    offset?: number;
+    limit?: number;
+  }): Promise<any> {
     const lastUpdated = this.formatDate(page.updated_at);
     const created = this.formatDate(page.created_at);
-    const contentPreview = page.text ? `${page.text.substring(0, 200)}${page.text.length > 200 ? '...' : ''}` : 'No content preview available';
     const url = await this.generatePageUrl(page);
 
+    // Pick a single content format to return to avoid 3x duplication (html + markdown + text)
+    const format = options?.format ?? 'markdown';
+    const fullContent: string =
+      (format === 'html' ? page.html : format === 'text' ? page.text : page.markdown) || '';
+
+    // Character-range slicing so very large pages can be paginated
+    const DEFAULT_LIMIT = 50000;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const limit = Math.max(1, options?.limit ?? DEFAULT_LIMIT);
+    const totalChars = fullContent.length;
+    const slice = fullContent.substring(offset, offset + limit);
+    const nextOffset = offset + slice.length;
+    const truncated = nextOffset < totalChars;
+
+    // Strip duplicate large fields from the base page object
+    const { html: _h, markdown: _m, text: _t, ...pageMeta } = page;
+
     return {
-      ...page,
+      ...pageMeta,
       url,
       direct_link: `[${page.name}](${url})`,
       last_updated_friendly: lastUpdated,
       created_friendly: created,
-      content_preview: contentPreview,
       content_info: `Page created ${created}, last updated ${lastUpdated}`,
       word_count: page.text ? page.text.split(' ').length : 0,
-      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`
+      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`,
+      content_format: format,
+      content_total_chars: totalChars,
+      content_offset: offset,
+      content_returned_chars: slice.length,
+      content_truncated: truncated,
+      content_next_offset: truncated ? nextOffset : null,
+      pagination_hint: truncated
+        ? `Only ${nextOffset}/${totalChars} characters returned. Call get_page again with offset=${nextOffset} to continue, or pass a larger limit.`
+        : undefined,
+      content: slice
     };
   }
 
@@ -374,13 +403,41 @@ export class BookStackClient {
 
     return {
       ...data,
-      data: await Promise.all(data.data.map((page: Page) => this.enhancePageResponse(page)))
+      data: await Promise.all(data.data.map((page: Page) => this.enhancePageListItem(page)))
     };
   }
 
-  async getPage(id: number): Promise<any> {
+  private async enhancePageListItem(page: Page): Promise<any> {
+    const lastUpdated = this.formatDate(page.updated_at);
+    const created = this.formatDate(page.created_at);
+    const url = await this.generatePageUrl(page);
+    const preview = page.text
+      ? `${page.text.substring(0, 200)}${page.text.length > 200 ? '...' : ''}`
+      : 'No content preview available';
+
+    // List responses from BookStack don't include html/markdown/text, but strip defensively
+    // and never embed full content here — use get_page for that.
+    const { html: _h, markdown: _m, text: _t, ...pageMeta } = page as any;
+
+    return {
+      ...pageMeta,
+      url,
+      direct_link: `[${page.name}](${url})`,
+      last_updated_friendly: lastUpdated,
+      created_friendly: created,
+      content_preview: preview,
+      content_info: `Page created ${created}, last updated ${lastUpdated}`,
+      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`
+    };
+  }
+
+  async getPage(id: number, options?: {
+    format?: 'markdown' | 'html' | 'text';
+    offset?: number;
+    limit?: number;
+  }): Promise<any> {
     const response = await this.client.get(`/pages/${id}`);
-    return await this.enhancePageResponse(response.data);
+    return await this.enhancePageResponse(response.data, options);
   }
 
   async getChapters(bookId?: number, offset = 0, count = 50): Promise<any> {
