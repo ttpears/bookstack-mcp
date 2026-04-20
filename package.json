@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "tsc && shx chmod +x dist/*.js",
+    "bundle": "ncc build src/index.ts -o build -m",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@vercel/ncc": "^0.38.4",
     "shx": "^0.4.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0"

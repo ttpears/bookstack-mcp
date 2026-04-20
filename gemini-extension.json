@@ -5,7 +5,7 @@
   "mcpServers": {
     "bookstack": {
       "command": "node",
-      "args": ["${extensionPath}/dist/index.js"],
+      "args": ["${extensionPath}/build/index.js"],
       "cwd": "${extensionPath}"
     }
   },
