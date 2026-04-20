@@ -2,6 +2,7 @@
   "name": "bookstack-mcp",
   "version": "3.0.0",
   "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
+  "icon": "logo.png",
   "mcpServers": {
     "bookstack": {
       "command": "node",

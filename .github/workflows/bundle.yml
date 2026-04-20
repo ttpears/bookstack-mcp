@@ -1,0 +1,38 @@
+name: Compile BookStack Extension
+
+on:
+  push:
+    branches:
+      - main
+      - add-gemini-cli-support
+  pull_request:
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Bundle Extension
+        run: npm run bundle
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build/
+          git commit -m "chore: auto-update standalone bundle [skip ci]" || echo "No changes to commit"
+          git push
