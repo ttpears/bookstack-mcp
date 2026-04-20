@@ -126,6 +126,16 @@ This repo ships a Claude Code plugin manifest (`.claude-plugin/plugin.json`). Ad
 
 Then set the `BOOKSTACK_*` environment variables in your shell so the plugin's MCP server can authenticate.
 
+### Gemini CLI
+
+This repo ships a `gemini-extension.json` manifest. You can install it directly from GitHub using the Gemini CLI:
+
+```bash
+gemini extensions install https://github.com/ttpears/bookstack-mcp
+```
+
+During installation, the CLI will prompt you to save your `BOOKSTACK_BASE_URL` and API tokens.
+
 ## MCP Resources
 
 Books and pages are also exposed as MCP resources, so clients that browse resources (Claude Desktop, MCP Inspector, etc.) can `@`-mention them directly:
