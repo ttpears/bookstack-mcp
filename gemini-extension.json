@@ -9,6 +9,7 @@
       "cwd": "${extensionPath}"
     }
   },
+  "contextFileName": "GEMINI.md",
   "settings": [
     {
       "name": "BookStack URL",
