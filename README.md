@@ -128,13 +128,13 @@ Then set the `BOOKSTACK_*` environment variables in your shell so the plugin's M
 
 ### Gemini CLI
 
-This repo ships a `gemini-extension.json` manifest. You can install it directly from GitHub using the Gemini CLI:
+This repo ships a `gemini-extension.json` manifest and a pre-compiled standalone bundle. You can install it directly from GitHub using the Gemini CLI:
 
 ```bash
 gemini extensions install https://github.com/ttpears/bookstack-mcp
 ```
 
-During installation, the CLI will prompt you to save your `BOOKSTACK_BASE_URL` and API tokens.
+During installation, the CLI will automatically prompt you for your `BOOKSTACK_BASE_URL` and API tokens. No local build or npm install is required.
 
 ## MCP Resources
 
