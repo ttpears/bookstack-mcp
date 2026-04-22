@@ -924,7 +924,8 @@ async function main() {
     baseUrl: getRequiredEnvVar('BOOKSTACK_BASE_URL'),
     tokenId: getRequiredEnvVar('BOOKSTACK_TOKEN_ID'),
     tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
-    enableWrite: process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true'
+    enableWrite: process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true',
+    ignoreCertErrors: process.env.BOOKSTACK_IGNORE_CERT_ERRORS?.toLowerCase() === 'true'
   };
 
   console.error('Initializing BookStack MCP Server...');

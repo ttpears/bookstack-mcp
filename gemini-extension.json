@@ -35,6 +35,12 @@
       "description": "Set to \"true\" to enable write operations, \"false\" for read-only",
       "envVar": "BOOKSTACK_ENABLE_WRITE",
       "sensitive": false
+    },
+    {
+      "name": "Ignore Certificate Errors",
+      "description": "Set to \"true\" to skip SSL certificate validation (useful for LAN/self-signed certs)",
+      "envVar": "BOOKSTACK_IGNORE_CERT_ERRORS",
+      "sensitive": false
     }
   ]
 }
