@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1F3A5F"/>
+      <stop offset="100%" stop-color="#0E1B2E"/>
+    </linearGradient>
+    <linearGradient id="book-bottom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E76F51"/>
+      <stop offset="100%" stop-color="#C9523A"/>
+    </linearGradient>
+    <linearGradient id="book-mid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F4A261"/>
+      <stop offset="100%" stop-color="#D8854A"/>
+    </linearGradient>
+    <linearGradient id="book-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9C46A"/>
+      <stop offset="100%" stop-color="#C9A24E"/>
+    </linearGradient>
+    <radialGradient id="node-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#7DC9D6" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#7DC9D6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.35"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#vignette)"/>
+
+  <!-- Logo, scaled and positioned on the left -->
+  <g transform="translate(80,128) scale(1.5)">
+    <g>
+      <rect x="40" y="170" width="170" height="34" rx="5" fill="url(#book-bottom)"/>
+      <rect x="56" y="178" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.45"/>
+      <rect x="66" y="178" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.25"/>
+      <rect x="50" y="128" width="150" height="34" rx="5" fill="url(#book-mid)"/>
+      <rect x="66" y="136" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.45"/>
+      <rect x="76" y="136" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.25"/>
+      <rect x="64" y="86" width="120" height="34" rx="5" fill="url(#book-top)"/>
+      <rect x="80" y="94" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.45"/>
+      <rect x="90" y="94" width="4" height="18" rx="1" fill="#fff" fill-opacity="0.25"/>
+    </g>
+    <line x1="184" y1="92" x2="210" y2="56" stroke="#7DC9D6" stroke-width="3" stroke-linecap="round" stroke-opacity="0.8"/>
+    <circle cx="210" cy="56" r="22" fill="url(#node-glow)"/>
+    <circle cx="210" cy="56" r="13" fill="#7DC9D6"/>
+    <circle cx="210" cy="56" r="6" fill="#0E1B2E"/>
+  </g>
+
+  <!-- Wordmark + tagline on the right -->
+  <g transform="translate(560,260)" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+    <text x="0" y="0" font-size="84" font-weight="700" fill="#F4F1DE" letter-spacing="-2">bookstack-mcp</text>
+    <text x="0" y="60" font-size="32" font-weight="400" fill="#7DC9D6" letter-spacing="0.5">Model Context Protocol server for BookStack</text>
+    <text x="0" y="130" font-size="24" font-weight="400" fill="#F4F1DE" fill-opacity="0.7">Search · Read · Create · Manage your wiki via AI</text>
+  </g>
+</svg>
