@@ -17,8 +17,9 @@ npx bookstack-mcp
 
 ## Features
 
-- 17 read-only tools + 10 write tools for complete BookStack API coverage
-- Books, chapters, pages, shelves, and attachments — full CRUD where it matters
+- 20 read-only tools + 18 write tools for complete BookStack API coverage
+- Books, chapters, pages, shelves, attachments, and comments — full CRUD
+- Recycle bin support — restore or permanently delete soft-deleted content
 - Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
 - Embedded URLs and content previews in all responses
 - Markdown export fallback for HTML-authored pages, so AI clients always get usable content
@@ -167,6 +168,8 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `get_chapters` / `get_chapter` | List or get chapter details |
 | `get_shelves` / `get_shelf` | List or get shelf details |
 | `get_attachments` / `get_attachment` | List or get attachment details |
+| `get_comments` / `get_comment` | List or get page comments (BookStack v25.11+) |
+| `get_recycle_bin` | List items in the recycle bin |
 | `export_page` | Export page as HTML, PDF, Markdown, plaintext, or ZIP |
 | `export_book` | Export entire book |
 | `export_chapter` | Export chapter |
@@ -176,12 +179,15 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 
 | Tool | Description |
 |------|-------------|
-| `create_book` | Create a new book |
-| `create_chapter` | Create a new chapter inside a book |
+| `create_book` / `delete_book` | Create or delete a book |
+| `create_chapter` / `delete_chapter` | Create or delete a chapter |
 | `create_page` | Create a new page (HTML or Markdown) |
-| `update_page` | Update page content, rename, or move it to a different book/chapter |
+| `update_page` | Update content, rename, or move to a different book/chapter |
+| `delete_page` | Delete a page (recoverable from recycle bin) |
 | `create_shelf` / `update_shelf` / `delete_shelf` | Manage shelves |
 | `create_attachment` / `update_attachment` / `delete_attachment` | Manage attachments |
+| `create_comment` / `update_comment` / `delete_comment` | Manage page comments (v25.11+) |
+| `restore_deleted` / `permanently_delete` | Restore or permanently destroy items in the recycle bin |
 
 ## BookStack API Setup
 

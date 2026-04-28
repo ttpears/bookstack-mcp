@@ -583,6 +583,71 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     }
   );
 
+  readTool(
+    "get_comments",
+    {
+      title: "List Comments",
+      description: "List comments, optionally filtered to a single page. Requires BookStack v25.11+.",
+      inputSchema: {
+        page_id: z.coerce.number().optional().describe("Filter to comments on this page"),
+        offset: z.coerce.number().default(0).describe("Pagination offset"),
+        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
+        sort: z.string().optional().describe("Sort field")
+      }
+    },
+    async (args) => {
+      const comments = await client.getComments({
+        pageId: args.page_id,
+        offset: args.offset,
+        count: args.count,
+        sort: args.sort
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(comments, null, 2) }]
+      };
+    }
+  );
+
+  readTool(
+    "get_comment",
+    {
+      title: "Get Comment",
+      description: "Get a single comment by ID. Requires BookStack v25.11+.",
+      inputSchema: {
+        id: z.coerce.number().min(1).describe("Comment ID")
+      }
+    },
+    async (args) => {
+      const comment = await client.getComment(args.id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+      };
+    }
+  );
+
+  readTool(
+    "get_recycle_bin",
+    {
+      title: "List Recycle Bin",
+      description: "List items in the recycle bin (deleted books, chapters, pages, shelves). Requires admin permissions on the API token.",
+      inputSchema: {
+        offset: z.coerce.number().default(0).describe("Pagination offset"),
+        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
+        sort: z.string().optional().describe("Sort field")
+      }
+    },
+    async (args) => {
+      const items = await client.getRecycleBin({
+        offset: args.offset,
+        count: args.count,
+        sort: args.sort
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(items, null, 2) }]
+      };
+    }
+  );
+
   // Register write tools if enabled
   if (config.enableWrite) {
     writeTool(
@@ -826,6 +891,155 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       },
       async (args) => {
         const result = await client.deleteAttachment(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "delete_book",
+      {
+        title: "Delete Book",
+        description: "Delete a book. Goes to the recycle bin and can be restored from there.",
+        inputSchema: {
+          id: z.coerce.number().min(1).describe("Book ID")
+        }
+      },
+      async (args) => {
+        const result = await client.deleteBook(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "delete_chapter",
+      {
+        title: "Delete Chapter",
+        description: "Delete a chapter. Goes to the recycle bin and can be restored from there.",
+        inputSchema: {
+          id: z.coerce.number().min(1).describe("Chapter ID")
+        }
+      },
+      async (args) => {
+        const result = await client.deleteChapter(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "delete_page",
+      {
+        title: "Delete Page",
+        description: "Delete a page. Goes to the recycle bin and can be restored from there.",
+        inputSchema: {
+          id: z.coerce.number().min(1).describe("Page ID")
+        }
+      },
+      async (args) => {
+        const result = await client.deletePage(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "create_comment",
+      {
+        title: "Create Comment",
+        description: "Add a comment to a page. Pass parent_id to reply to an existing comment. Requires BookStack v25.11+.",
+        inputSchema: {
+          page_id: z.coerce.number().min(1).describe("Page ID to comment on"),
+          html: z.string().describe("Comment HTML body"),
+          parent_id: z.coerce.number().optional().describe("Optional: parent comment ID for threaded replies"),
+          content_ref: z.string().optional().describe("Optional: anchor/selection reference within the page")
+        }
+      },
+      async (args) => {
+        const comment = await client.createComment({
+          page_id: args.page_id,
+          html: args.html,
+          parent_id: args.parent_id,
+          content_ref: args.content_ref
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "update_comment",
+      {
+        title: "Update Comment",
+        description: "Edit a comment's body or archive/unarchive it. Requires BookStack v25.11+.",
+        inputSchema: {
+          id: z.coerce.number().min(1).describe("Comment ID"),
+          html: z.string().optional().describe("Optional: new HTML body"),
+          archived: z.boolean().optional().describe("Optional: archive (true) or unarchive (false) the comment")
+        }
+      },
+      async (args) => {
+        const comment = await client.updateComment(args.id, {
+          html: args.html,
+          archived: args.archived
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "delete_comment",
+      {
+        title: "Delete Comment",
+        description: "Delete a comment. Requires BookStack v25.11+.",
+        inputSchema: {
+          id: z.coerce.number().min(1).describe("Comment ID")
+        }
+      },
+      async (args) => {
+        const result = await client.deleteComment(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "restore_deleted",
+      {
+        title: "Restore from Recycle Bin",
+        description: "Restore a deleted item from the recycle bin. Use the deletion ID from get_recycle_bin (not the original entity ID). Requires admin permissions.",
+        inputSchema: {
+          deletion_id: z.coerce.number().min(1).describe("Deletion ID (from get_recycle_bin)")
+        }
+      },
+      async (args) => {
+        const result = await client.restoreFromRecycleBin(args.deletion_id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "permanently_delete",
+      {
+        title: "Permanently Delete from Recycle Bin",
+        description: "PERMANENTLY destroys a deleted item — this cannot be undone. Use the deletion ID from get_recycle_bin. Requires admin permissions.",
+        inputSchema: {
+          deletion_id: z.coerce.number().min(1).describe("Deletion ID (from get_recycle_bin)")
+        }
+      },
+      async (args) => {
+        const result = await client.destroyFromRecycleBin(args.deletion_id);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
         };

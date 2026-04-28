@@ -519,6 +519,30 @@ export class BookStackClient {
     return await this.enhancePageResponse(response.data);
   }
 
+  async deleteBook(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/books/${id}`);
+    return response.data;
+  }
+
+  async deleteChapter(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/chapters/${id}`);
+    return response.data;
+  }
+
+  async deletePage(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/pages/${id}`);
+    return response.data;
+  }
+
   async updatePage(id: number, data: {
     name?: string;
     html?: string;
@@ -886,6 +910,93 @@ export class BookStackClient {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
     }
     const response = await this.client.delete(`/attachments/${id}`);
+    return response.data;
+  }
+
+  // Comments (BookStack v25.11+)
+  async getComments(options?: {
+    pageId?: number;
+    offset?: number;
+    count?: number;
+    sort?: string;
+  }): Promise<any> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    if (options?.pageId) params['filter[commentable_id]'] = options.pageId;
+    if (options?.sort) params.sort = options.sort;
+
+    const response = await this.client.get('/comments', { params });
+    return response.data;
+  }
+
+  async getComment(id: number): Promise<any> {
+    const response = await this.client.get(`/comments/${id}`);
+    return response.data;
+  }
+
+  async createComment(data: {
+    page_id: number;
+    html: string;
+    parent_id?: number;
+    content_ref?: string;
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.post('/comments', data);
+    return response.data;
+  }
+
+  async updateComment(id: number, data: {
+    html?: string;
+    archived?: boolean;
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.put(`/comments/${id}`, data);
+    return response.data;
+  }
+
+  async deleteComment(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/comments/${id}`);
+    return response.data;
+  }
+
+  // Recycle Bin
+  async getRecycleBin(options?: {
+    offset?: number;
+    count?: number;
+    sort?: string;
+  }): Promise<any> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    if (options?.sort) params.sort = options.sort;
+
+    const response = await this.client.get('/recycle-bin', { params });
+    return response.data;
+  }
+
+  async restoreFromRecycleBin(deletionId: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.put(`/recycle-bin/${deletionId}`);
+    return response.data;
+  }
+
+  async destroyFromRecycleBin(deletionId: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/recycle-bin/${deletionId}`);
     return response.data;
   }
 }
