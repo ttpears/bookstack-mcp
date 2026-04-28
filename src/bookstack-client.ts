@@ -207,8 +207,11 @@ export class BookStackClient {
     const nextOffset = offset + slice.length;
     const truncated = nextOffset < totalChars;
 
-    // Strip duplicate large fields from the base page object
-    const { html: _h, markdown: _m, text: _t, ...pageMeta } = page;
+    // Strip duplicate large fields from the base page object. raw_html is the
+    // unprocessed editor source BookStack returns alongside html/markdown/text;
+    // leaving it in would bypass the limit/offset pagination and can blow past
+    // MCP token caps for large pages.
+    const { html: _h, markdown: _m, text: _t, raw_html: _r, ...pageMeta } = page as any;
 
     return {
       ...pageMeta,
@@ -424,9 +427,9 @@ export class BookStackClient {
       ? `${page.text.substring(0, 200)}${page.text.length > 200 ? '...' : ''}`
       : 'No content preview available';
 
-    // List responses from BookStack don't include html/markdown/text, but strip defensively
-    // and never embed full content here — use get_page for that.
-    const { html: _h, markdown: _m, text: _t, ...pageMeta } = page as any;
+    // List responses from BookStack don't include html/markdown/text/raw_html, but strip
+    // defensively and never embed full content here — use get_page for that.
+    const { html: _h, markdown: _m, text: _t, raw_html: _r, ...pageMeta } = page as any;
 
     return {
       ...pageMeta,

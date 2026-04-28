@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BookStack MCP Server v2.1 — A TypeScript MCP server providing BookStack wiki integration for AI assistants. Published to npm as `bookstack-mcp`. Uses McpServer API with `registerTool()` and Zod schemas with `z.coerce.number()` for broad MCP client compatibility.
+BookStack MCP Server — A TypeScript MCP server providing BookStack wiki integration for AI assistants. Published to npm as `bookstack-mcp`. Uses McpServer API with `registerTool()` and Zod schemas with `z.coerce.number()` for broad MCP client compatibility. Current version is tracked in `package.json`.
 
 ## Build & Development Commands
 
@@ -42,6 +42,7 @@ BOOKSTACK_BASE_URL=https://your-bookstack.com   # Required
 BOOKSTACK_TOKEN_ID=your-token-id                # Required
 BOOKSTACK_TOKEN_SECRET=your-token-secret        # Required
 BOOKSTACK_ENABLE_WRITE=false                    # Optional
+BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=false        # Optional, for self-signed BookStack
 ```
 
 ### TypeScript Configuration
@@ -57,7 +58,24 @@ Published as `bookstack-mcp`. Key package.json fields:
 - `prepare`: runs build (triggers on install from git and before publish)
 - `engines`: `>=18`
 
-To publish: `npm publish` (package is unscoped, no `--access public` needed)
+## Release Process
+
+Releases are fully automated by GitHub Actions — **never run `npm publish` locally**.
+
+1. Bump `version` in `package.json` (semver) in the same PR/commit as the changes you want to ship.
+2. Merge to `main`.
+3. `.github/workflows/ci.yml` runs:
+   - `build` job: `npm ci` + `npm run build` on every push and PR.
+   - `tag` job (main only): if `package.json` version doesn't already have a matching `v${version}` git tag, it creates and pushes one using `RELEASE_PAT` (a PAT is required because the default `GITHUB_TOKEN` cannot trigger downstream workflows).
+4. The pushed tag triggers `.github/workflows/release.yml`, which:
+   - Builds, then upgrades npm to the latest (Node 20 ships npm 10.x; trusted publishing needs ≥ 11.5.1).
+   - Publishes via npm **trusted publishing (OIDC)** with `--provenance` — no `NPM_TOKEN`. The npm CLI exchanges the Actions OIDC token (`id-token: write`) for a short-lived registry token at publish time. This requires the npm package to have a trusted publisher configured pointing at this repo's `release.yml`.
+   - Creates a GitHub Release for the tag with auto-generated notes (`gh release create --generate-notes`).
+
+Notes:
+- Don't tag manually — let the `tag` job do it from the version bump. Manually pushed tags will still trigger `release.yml`, but you bypass the version-changed gate.
+- If `RELEASE_PAT` is missing/expired, the tag never gets pushed and the release silently doesn't happen. Symptom: CI green on main, no new tag, no npm release.
+- Don't add an `NPM_TOKEN` secret — trusted publishing replaces it. Adding one weakens the threat model.
 
 ## Key Implementation Details
 

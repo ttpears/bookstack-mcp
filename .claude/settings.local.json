@@ -14,7 +14,14 @@
       "WebFetch(domain:spec.modelcontextprotocol.io)",
       "WebFetch(domain:modelcontextprotocol.io)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:www.librechat.ai)",
+      "Bash(gh api *)",
+      "Bash(python3 -m json.tool)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(gh repo *)",
+      "WebFetch(domain:bookstack.bassopaolo.com)"
     ],
     "deny": [],
     "ask": [],

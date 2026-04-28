@@ -137,7 +137,24 @@ Restart LibreChat after config changes.
 
 ### Claude Code (CLI)
 
-Add the server with `claude mcp add`. Repeat `--env` for each variable, and put all flags **before** the server name; the `--` separator marks the start of the command Claude Code will spawn:
+The recommended path is the `ttpears/claude-plugins` marketplace, which ships this repo's plugin manifest (`.claude-plugin/plugin.json`):
+
+```
+/plugin marketplace add ttpears/claude-plugins
+/plugin install bookstack-mcp@ttpears-plugins
+```
+
+Then set the `BOOKSTACK_*` environment variables in your shell so the plugin's MCP server can authenticate:
+
+```bash
+export BOOKSTACK_BASE_URL=https://your-bookstack.com
+export BOOKSTACK_TOKEN_ID=your-token-id
+export BOOKSTACK_TOKEN_SECRET=your-token-secret
+```
+
+#### Manual install (alternative)
+
+If you'd rather not use the marketplace, register the server directly with `claude mcp add`. Repeat `--env` for each variable, put all flags **before** the server name, and use `--` to mark the start of the command Claude Code will spawn:
 
 ```bash
 claude mcp add bookstack \
@@ -177,17 +194,6 @@ The resulting config entry looks like this (in `.mcp.json` for project scope, or
 ```
 
 > **Tip for committed `.mcp.json`:** Claude Code expands `${VAR}` and `${VAR:-default}` references in `.mcp.json` from the surrounding shell. Use that to keep secrets out of git: set `"BOOKSTACK_TOKEN_SECRET": "${BOOKSTACK_TOKEN_SECRET}"` in the file and have each developer export the variable in their shell.
-
-### Claude Code (plugin marketplace)
-
-This repo also ships a Claude Code plugin manifest (`.claude-plugin/plugin.json`). Add the marketplace and install:
-
-```
-/plugin marketplace add ttpears/claude-plugins
-/plugin install bookstack-mcp@ttpears-plugins
-```
-
-Then set the `BOOKSTACK_*` environment variables in your shell so the plugin's MCP server can authenticate.
 
 ## MCP Resources
 
