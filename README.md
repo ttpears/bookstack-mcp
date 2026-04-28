@@ -51,7 +51,10 @@ BOOKSTACK_BASE_URL=https://your-bookstack.com   # Required
 BOOKSTACK_TOKEN_ID=your-token-id                # Required
 BOOKSTACK_TOKEN_SECRET=your-token-secret        # Required
 BOOKSTACK_ENABLE_WRITE=false                    # Optional, default false
+BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=false        # Optional, default false
 ```
+
+> **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
 
 ## Client Configuration
 

@@ -1,10 +1,12 @@
 import axios, { AxiosInstance } from 'axios';
+import https from 'https';
 
 export interface BookStackConfig {
   baseUrl: string;
   tokenId: string;
   tokenSecret: string;
   enableWrite?: boolean;
+  insecureSkipTlsVerify?: boolean;
 }
 
 export interface Book {
@@ -110,7 +112,10 @@ export class BookStackClient {
       headers: {
         'Authorization': `Token ${config.tokenId}:${config.tokenSecret}`,
         'Content-Type': 'application/json'
-      }
+      },
+      httpsAgent: config.insecureSkipTlsVerify
+        ? new https.Agent({ rejectUnauthorized: false })
+        : undefined
     });
   }
 
