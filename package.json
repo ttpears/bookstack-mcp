@@ -1,6 +1,6 @@
 {
   "name": "bookstack-mcp",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "MCP server for BookStack wiki — search, read, create, and manage documentation via AI assistants",
   "type": "module",
   "bin": {

@@ -1,5 +1,16 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import https from 'https';
+
+const MAX_RETRIES_429 = 5;
+
+function parseRetryAfter(value: unknown): number | null {
+  if (typeof value !== 'string' || !value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  return null;
+}
 
 export interface BookStackConfig {
   baseUrl: string;
@@ -116,6 +127,19 @@ export class BookStackClient {
       httpsAgent: config.insecureSkipTlsVerify
         ? new https.Agent({ rejectUnauthorized: false })
         : undefined
+    });
+
+    this.client.interceptors.response.use(undefined, async (error: AxiosError) => {
+      const cfg = error.config as (InternalAxiosRequestConfig & { __retry429?: number }) | undefined;
+      if (!cfg || error.response?.status !== 429) throw error;
+      cfg.__retry429 = (cfg.__retry429 ?? 0) + 1;
+      if (cfg.__retry429 > MAX_RETRIES_429) throw error;
+      const retryAfter = parseRetryAfter(error.response.headers?.['retry-after']);
+      const backoff = Math.min(30000, 1000 * 2 ** (cfg.__retry429 - 1));
+      const delay = retryAfter ?? backoff;
+      console.error(`BookStack rate limited (429); retry ${cfg.__retry429}/${MAX_RETRIES_429} in ${delay}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return this.client.request(cfg);
     });
   }
 
