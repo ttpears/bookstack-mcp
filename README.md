@@ -135,9 +135,52 @@ When binding to `0.0.0.0` (e.g. inside a container reachable from other services
 
 Restart LibreChat after config changes.
 
+### Claude Code (CLI)
+
+Add the server with `claude mcp add`. Repeat `--env` for each variable, and put all flags **before** the server name; the `--` separator marks the start of the command Claude Code will spawn:
+
+```bash
+claude mcp add bookstack \
+  --transport stdio \
+  --scope user \
+  --env BOOKSTACK_BASE_URL=https://your-bookstack.com \
+  --env BOOKSTACK_TOKEN_ID=your-token-id \
+  --env BOOKSTACK_TOKEN_SECRET=your-token-secret \
+  -- npx -y bookstack-mcp
+```
+
+Scope picks where the entry is written:
+
+| Scope | Where it lives | Shared via git | Use it when |
+|-------|----------------|----------------|-------------|
+| `local` (default) | `~/.claude.json`, scoped to the current project | No | Trying it out in one repo |
+| `user` | `~/.claude.json`, available in every project | No | You want bookstack everywhere |
+| `project` | `.mcp.json` at the repo root | Yes | The whole team should get it |
+
+The resulting config entry looks like this (in `.mcp.json` for project scope, or `~/.claude.json` otherwise):
+
+```json
+{
+  "mcpServers": {
+    "bookstack": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "bookstack-mcp"],
+      "env": {
+        "BOOKSTACK_BASE_URL": "https://your-bookstack.com",
+        "BOOKSTACK_TOKEN_ID": "your-token-id",
+        "BOOKSTACK_TOKEN_SECRET": "your-token-secret"
+      }
+    }
+  }
+}
+```
+
+> **Tip for committed `.mcp.json`:** Claude Code expands `${VAR}` and `${VAR:-default}` references in `.mcp.json` from the surrounding shell. Use that to keep secrets out of git: set `"BOOKSTACK_TOKEN_SECRET": "${BOOKSTACK_TOKEN_SECRET}"` in the file and have each developer export the variable in their shell.
+
 ### Claude Code (plugin marketplace)
 
-This repo ships a Claude Code plugin manifest (`.claude-plugin/plugin.json`). Add the marketplace and install:
+This repo also ships a Claude Code plugin manifest (`.claude-plugin/plugin.json`). Add the marketplace and install:
 
 ```
 /plugin marketplace add ttpears/claude-plugins
