@@ -114,6 +114,14 @@ export class BookStackClient {
     });
   }
 
+  private applyFilters(params: Record<string, any>, filter?: Record<string, any>): void {
+    if (!filter) return;
+    for (const [key, value] of Object.entries(filter)) {
+      if (value === undefined || value === null) continue;
+      params[`filter[${key}]`] = value;
+    }
+  }
+
   private async getBookSlug(bookId: number): Promise<string> {
     // Check cache first
     if (this.bookSlugCache.has(bookId)) {
@@ -358,8 +366,8 @@ export class BookStackClient {
     };
     
     if (options?.sort) params.sort = options.sort;
-    if (options?.filter) params.filter = JSON.stringify(options.filter);
-    
+    this.applyFilters(params, options?.filter);
+
     const response = await this.client.get('/books', { params });
     const data = response.data;
     
@@ -387,14 +395,10 @@ export class BookStackClient {
       count: Math.min(options?.count || 50, 500)
     };
 
-    // Build filter object
-    const filter: any = { ...options?.filter };
+    const filter: Record<string, any> = { ...options?.filter };
     if (options?.bookId) filter.book_id = options.bookId;
     if (options?.chapterId) filter.chapter_id = options.chapterId;
-
-    if (Object.keys(filter).length > 0) {
-      params.filter = JSON.stringify(filter);
-    }
+    this.applyFilters(params, filter);
 
     if (options?.sort) params.sort = options.sort;
 
@@ -437,12 +441,30 @@ export class BookStackClient {
     limit?: number;
   }): Promise<any> {
     const response = await this.client.get(`/pages/${id}`);
-    return await this.enhancePageResponse(response.data, options);
+    const pageData = response.data;
+
+    // BookStack stores either markdown or html depending on the editor used to
+    // author the page. If markdown was requested but the page was authored in
+    // the WYSIWYG editor, page.markdown comes back empty. Fall back to the
+    // server-side HTML→markdown export so the caller still gets usable content.
+    const requestedFormat = options?.format ?? 'markdown';
+    if (requestedFormat === 'markdown' && !pageData.markdown) {
+      try {
+        const exportResponse = await this.client.get(`/pages/${id}/export/markdown`);
+        if (exportResponse.data) {
+          pageData.markdown = exportResponse.data;
+        }
+      } catch (error) {
+        console.error(`Markdown export fallback failed for page ${id}:`, error);
+      }
+    }
+
+    return await this.enhancePageResponse(pageData, options);
   }
 
   async getChapters(bookId?: number, offset = 0, count = 50): Promise<any> {
     const params: any = { offset, count };
-    if (bookId) params.filter = JSON.stringify({ book_id: bookId });
+    if (bookId) params['filter[book_id]'] = bookId;
 
     const response = await this.client.get('/chapters', { params });
     const data = response.data;
@@ -455,6 +477,31 @@ export class BookStackClient {
 
   async getChapter(id: number): Promise<any> {
     const response = await this.client.get(`/chapters/${id}`);
+    return await this.enhanceChapterResponse(response.data);
+  }
+
+  async createBook(data: {
+    name: string;
+    description?: string;
+    tags?: Tag[];
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.post('/books', data);
+    return this.enhanceBookResponse(response.data);
+  }
+
+  async createChapter(data: {
+    book_id: number;
+    name: string;
+    description?: string;
+    tags?: Tag[];
+  }): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.post('/chapters', data);
     return await this.enhanceChapterResponse(response.data);
   }
 
@@ -476,6 +523,8 @@ export class BookStackClient {
     name?: string;
     html?: string;
     markdown?: string;
+    book_id?: number;
+    chapter_id?: number;
   }): Promise<any> {
     if (!this.enableWrite) {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
@@ -705,8 +754,8 @@ export class BookStackClient {
     };
     
     if (options?.sort) params.sort = options.sort;
-    if (options?.filter) params.filter = JSON.stringify(options.filter);
-    
+    this.applyFilters(params, options?.filter);
+
     const response = await this.client.get('/shelves', { params });
     const data = response.data;
     
@@ -768,8 +817,8 @@ export class BookStackClient {
     };
     
     if (options?.sort) params.sort = options.sort;
-    if (options?.filter) params.filter = JSON.stringify(options.filter);
-    
+    this.applyFilters(params, options?.filter);
+
     const response = await this.client.get('/attachments', { params });
     const data = response.data;
     

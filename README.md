@@ -1,14 +1,30 @@
 # BookStack MCP Server
 
+[![npm version](https://img.shields.io/npm/v/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
+[![CI](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/node/v/bookstack-mcp)](https://nodejs.org)
+[![MCP](https://img.shields.io/badge/MCP-compatible-7DC9D6)](https://modelcontextprotocol.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+<img src="assets/logo.svg" width="96" align="right" alt="bookstack-mcp"/>
+
 A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that gives AI assistants full access to your [BookStack](https://www.bookstackapp.com) documentation — search, read, create, and manage content.
+
+```bash
+npx bookstack-mcp
+```
 
 ## Features
 
-- 17 read-only tools + 8 write tools for complete BookStack API coverage
+- 17 read-only tools + 10 write tools for complete BookStack API coverage
+- Books, chapters, pages, shelves, and attachments — full CRUD where it matters
 - Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
 - Embedded URLs and content previews in all responses
+- Markdown export fallback for HTML-authored pages, so AI clients always get usable content
 - Write operations disabled by default for safety
-- Works with Claude Desktop, LibreChat, and any MCP-compatible client
+- Works with Claude Desktop, Claude Code, LibreChat, and any MCP-compatible client
+- Stdio and Streamable HTTP transports
 
 ## Quick Start
 
@@ -160,7 +176,10 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 
 | Tool | Description |
 |------|-------------|
-| `create_page` / `update_page` | Create or update pages |
+| `create_book` | Create a new book |
+| `create_chapter` | Create a new chapter inside a book |
+| `create_page` | Create a new page (HTML or Markdown) |
+| `update_page` | Update page content, rename, or move it to a different book/chapter |
 | `create_shelf` / `update_shelf` / `delete_shelf` | Manage shelves |
 | `create_attachment` / `update_attachment` / `delete_attachment` | Manage attachments |
 

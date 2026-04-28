@@ -586,6 +586,60 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   // Register write tools if enabled
   if (config.enableWrite) {
     writeTool(
+      "create_book",
+      {
+        title: "Create Book",
+        description: "Create a new book in BookStack",
+        inputSchema: {
+          name: z.string().describe("Book name"),
+          description: z.string().optional().describe("Optional: Book description"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Tags for the book")
+        }
+      },
+      async (args) => {
+        const book = await client.createBook({
+          name: args.name,
+          description: args.description,
+          tags: args.tags as any
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(book, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
+      "create_chapter",
+      {
+        title: "Create Chapter",
+        description: "Create a new chapter within a book",
+        inputSchema: {
+          book_id: z.coerce.number().min(1).describe("Book ID where the chapter will be created"),
+          name: z.string().describe("Chapter name"),
+          description: z.string().optional().describe("Optional: Chapter description"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Tags for the chapter")
+        }
+      },
+      async (args) => {
+        const chapter = await client.createChapter({
+          book_id: args.book_id,
+          name: args.name,
+          description: args.description,
+          tags: args.tags as any
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(chapter, null, 2) }]
+        };
+      }
+    );
+
+    writeTool(
       "create_page",
       {
         title: "Create Page",
@@ -616,19 +670,23 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       "update_page",
       {
         title: "Update Page",
-        description: "Update an existing page",
+        description: "Update an existing page. Pass book_id (and optionally chapter_id) to move the page to a different location.",
         inputSchema: {
           id: z.coerce.number().min(1).describe("Page ID"),
           name: z.string().optional().describe("Optional: New page name"),
           html: z.string().optional().describe("Optional: New HTML content"),
-          markdown: z.string().optional().describe("Optional: New Markdown content")
+          markdown: z.string().optional().describe("Optional: New Markdown content"),
+          book_id: z.coerce.number().min(1).optional().describe("Optional: Move page to this book"),
+          chapter_id: z.coerce.number().optional().describe("Optional: Move page into this chapter (must belong to the target book; pass 0 to move out of any chapter)")
         }
       },
       async (args) => {
         const page = await client.updatePage(args.id, {
           name: args.name,
           html: args.html,
-          markdown: args.markdown
+          markdown: args.markdown,
+          book_id: args.book_id,
+          chapter_id: args.chapter_id
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page, null, 2) }]
