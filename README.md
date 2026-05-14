@@ -60,7 +60,15 @@ BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=false        # Optional, default false
 
 ### Claude Desktop
 
-Add to your Claude Desktop config:
+The easiest install is the prebuilt MCPB bundle attached to each [GitHub release](https://github.com/ttpears/bookstack-mcp/releases/latest):
+
+1. Download `bookstack-mcp-<version>.mcpb` from the latest release.
+2. Open Claude Desktop → **Settings → Extensions** and drag the `.mcpb` file in (or click *Install Extension*).
+3. Fill in **BookStack URL**, **API Token ID**, and **API Token Secret**. Tokens are stored in your OS keychain. Leave **Enable Write Operations** as `false` for read-only access; set to `true` to enable create/update/delete tools.
+
+#### Manual install (JSON config)
+
+If you'd rather edit the config file directly:
 
 ```json
 {
