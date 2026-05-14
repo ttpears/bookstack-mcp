@@ -46,6 +46,10 @@ bower_components
 dist/
 build/
 
+# MCPB build artifacts
+dist-mcpb/
+*.mcpb
+
 # Logs
 logs
 *.log

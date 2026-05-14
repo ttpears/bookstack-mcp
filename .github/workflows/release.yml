@@ -31,7 +31,14 @@ jobs:
         # for a short-lived registry token at publish time.
         run: npm publish --access public --provenance
 
-      - name: Create GitHub Release
+      - name: Build MCPB bundle
+        run: node scripts/build-mcpb.mjs
+
+      - name: Create GitHub Release with MCPB asset
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create ${{ github.ref_name }} --generate-notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "bookstack-mcp-${VERSION}.mcpb#BookStack MCP — Claude Desktop / MCPB bundle"

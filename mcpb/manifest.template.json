@@ -1,0 +1,71 @@
+{
+  "manifest_version": "0.3",
+  "name": "bookstack-mcp",
+  "display_name": "BookStack Wiki",
+  "version": "__VERSION__",
+  "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
+  "author": {
+    "name": "Tim Pearson",
+    "url": "https://github.com/ttpears/bookstack-mcp"
+  },
+  "homepage": "https://github.com/ttpears/bookstack-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ttpears/bookstack-mcp"
+  },
+  "license": "MIT",
+  "keywords": ["mcp", "bookstack", "wiki", "documentation"],
+  "server": {
+    "type": "node",
+    "entry_point": "node_modules/bookstack-mcp/dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/node_modules/bookstack-mcp/dist/index.js"
+      ],
+      "env": {
+        "BOOKSTACK_BASE_URL": "${user_config.bookstack_base_url}",
+        "BOOKSTACK_TOKEN_ID": "${user_config.bookstack_token_id}",
+        "BOOKSTACK_TOKEN_SECRET": "${user_config.bookstack_token_secret}",
+        "BOOKSTACK_ENABLE_WRITE": "${user_config.bookstack_enable_write}",
+        "BOOKSTACK_INSECURE_SKIP_TLS_VERIFY": "${user_config.bookstack_insecure_skip_tls_verify}"
+      }
+    }
+  },
+  "user_config": {
+    "bookstack_base_url": {
+      "type": "string",
+      "title": "BookStack URL",
+      "description": "Base URL of your BookStack instance (e.g. https://your-bookstack.com).",
+      "required": true
+    },
+    "bookstack_token_id": {
+      "type": "string",
+      "title": "API Token ID",
+      "description": "BookStack API Token ID. Stored in your OS keychain.",
+      "sensitive": true,
+      "required": true
+    },
+    "bookstack_token_secret": {
+      "type": "string",
+      "title": "API Token Secret",
+      "description": "BookStack API Token Secret. Stored in your OS keychain.",
+      "sensitive": true,
+      "required": true
+    },
+    "bookstack_enable_write": {
+      "type": "string",
+      "title": "Enable Write Operations",
+      "description": "Set to \"true\" to enable write tools (create/update/delete pages, books, chapters). Leave as \"false\" for read-only access.",
+      "default": "false",
+      "required": false
+    },
+    "bookstack_insecure_skip_tls_verify": {
+      "type": "string",
+      "title": "Skip TLS Verification",
+      "description": "Set to \"true\" to skip SSL certificate validation (for self-signed / LAN BookStack instances). Leave as \"false\" otherwise.",
+      "default": "false",
+      "required": false
+    }
+  }
+}
