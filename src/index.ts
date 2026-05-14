@@ -195,9 +195,13 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     "search_content",
     {
       title: "Search BookStack Content",
-      description: "Search across BookStack content with contextual previews and location info",
+      description: "Search across BookStack content with contextual previews and location info. Supports BookStack's advanced search syntax — see the query parameter for caveats.",
       inputSchema: {
-        query: z.string().describe("Search query. Use BookStack advanced search syntax like {type:page} or {book_id:5}"),
+        query: z.string().describe(
+          "Search query. Supports BookStack advanced search syntax like {type:page} or {book_id:5}. " +
+          "Caveat: {created_by:X}, {updated_by:X}, and {owned_by:X} require a numeric user ID — pass a name and BookStack silently ignores the filter, returning the unfiltered query. " +
+          "Use the find_users tool to resolve names to IDs."
+        ),
         type: z.enum(["book", "page", "chapter", "bookshelf"]).optional().describe("Filter by content type"),
         count: z.coerce.number().max(500).optional().describe("Number of results to return (max 500)"),
         offset: z.coerce.number().optional().describe("Number of results to skip for pagination")
@@ -219,9 +223,13 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     "search_pages",
     {
       title: "Search Pages",
-      description: "Search specifically for pages with optional book filtering",
+      description: "Search specifically for pages with optional book filtering. Same advanced-search caveats as search_content — see the query parameter.",
       inputSchema: {
-        query: z.string().describe("Search query for pages"),
+        query: z.string().describe(
+          "Search query for pages. Supports BookStack advanced search syntax. " +
+          "Caveat: {created_by:X}, {updated_by:X}, and {owned_by:X} require a numeric user ID — pass a name and BookStack silently ignores the filter. " +
+          "Use the find_users tool to resolve names to IDs."
+        ),
         book_id: z.coerce.number().optional().describe("Filter results to pages within a specific book"),
         count: z.coerce.number().max(500).optional().describe("Number of results to return"),
         offset: z.coerce.number().optional().describe("Pagination offset")
@@ -621,6 +629,37 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       const comment = await client.getComment(args.id);
       return {
         content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+      };
+    }
+  );
+
+  readTool(
+    "find_users",
+    {
+      title: "Find Users",
+      description: "List BookStack users with optional filtering by name, email, or slug. Use this to resolve a person's name into the numeric user ID needed for {created_by:X}/{updated_by:X}/{owned_by:X} search filters and for the filter parameter on get_pages, get_books, etc. Requires admin permissions on the API token.",
+      inputSchema: {
+        name: z.string().optional().describe("Filter by user display name (partial match)"),
+        email: z.string().optional().describe("Filter by email address (partial match)"),
+        slug: z.string().optional().describe("Filter by URL slug (e.g. \"jane-doe\")"),
+        offset: z.coerce.number().default(0).describe("Pagination offset"),
+        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
+        sort: z.string().optional().describe("Sort field (e.g. 'name', '-created_at')")
+      }
+    },
+    async (args) => {
+      const filter: Record<string, any> = {};
+      if (args.name) filter.name = args.name;
+      if (args.email) filter.email = args.email;
+      if (args.slug) filter.slug = args.slug;
+      const users = await client.getUsers({
+        offset: args.offset,
+        count: args.count,
+        sort: args.sort,
+        filter: Object.keys(filter).length ? filter : undefined
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(users, null, 2) }]
       };
     }
   );

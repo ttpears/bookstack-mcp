@@ -12,6 +12,22 @@ function parseRetryAfter(value: unknown): number | null {
   return null;
 }
 
+// BookStack's advanced search silently ignores {created_by:X}/{updated_by:X}/{owned_by:X}
+// when X isn't a numeric user ID — the query falls back to unfiltered results, which is
+// a confusing footgun. Reject the bad form up front and point the caller at find_users.
+function validateUserIdFilters(query: string): void {
+  const re = /\{(created_by|updated_by|owned_by):([^}\s]+)\}/g;
+  for (const match of query.matchAll(re)) {
+    const [, field, value] = match;
+    if (!/^\d+$/.test(value)) {
+      throw new Error(
+        `Search filter {${field}:${value}} requires a numeric user ID, not "${value}". ` +
+        `Use the find_users tool to look up a user's ID by name, email, or slug.`
+      );
+    }
+  }
+}
+
 export interface BookStackConfig {
   baseUrl: string;
   tokenId: string;
@@ -87,6 +103,20 @@ export interface Attachment {
     html: string;
     markdown: string;
   };
+}
+
+export interface User {
+  id: number;
+  name: string;
+  slug: string;
+  email?: string;
+  external_auth_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_activity_at?: string;
+  profile_url?: string;
+  edit_url?: string;
+  avatar_url?: string;
 }
 
 export interface SearchResult {
@@ -347,6 +377,7 @@ export class BookStackClient {
     count?: number;
     offset?: number;
   }): Promise<any> {
+    validateUserIdFilters(query);
     let searchQuery = query;
 
     // Use advanced search syntax for type filtering
@@ -369,6 +400,7 @@ export class BookStackClient {
     count?: number;
     offset?: number;
   }): Promise<any> {
+    validateUserIdFilters(query);
     let searchQuery = `{type:page} ${query}`.trim();
 
     // Add book filtering if specified
@@ -1029,6 +1061,24 @@ export class BookStackClient {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
     }
     const response = await this.client.delete(`/recycle-bin/${deletionId}`);
+    return response.data;
+  }
+
+  // Users
+  async getUsers(options?: {
+    offset?: number;
+    count?: number;
+    sort?: string;
+    filter?: Record<string, any>;
+  }): Promise<ListResponse<User>> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    if (options?.sort) params.sort = options.sort;
+    this.applyFilters(params, options?.filter);
+
+    const response = await this.client.get('/users', { params });
     return response.data;
   }
 }

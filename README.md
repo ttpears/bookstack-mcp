@@ -229,6 +229,7 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `get_shelves` / `get_shelf` | List or get shelf details |
 | `get_attachments` / `get_attachment` | List or get attachment details |
 | `get_comments` / `get_comment` | List or get page comments (BookStack v25.11+) |
+| `find_users` | Look up BookStack users by name, email, or slug to resolve numeric user IDs for search filters |
 | `get_recycle_bin` | List items in the recycle bin |
 | `export_page` | Export page as HTML, PDF, Markdown, plaintext, or ZIP |
 | `export_book` | Export entire book |
