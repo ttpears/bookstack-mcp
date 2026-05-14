@@ -1,0 +1,48 @@
+{
+    "name": "bookstack-mcp",
+    "version": "3.3.2",
+    "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
+    "icon": "logo.png",
+    "mcpServers": {
+        "bookstack": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "bookstack-mcp"
+            ]
+        }
+    },
+    "contextFileName": "GEMINI.md",
+    "settings": [
+        {
+            "name": "BookStack URL",
+            "description": "The base URL for your BookStack instance (e.g. https://your-bookstack.com)",
+            "envVar": "BOOKSTACK_BASE_URL",
+            "sensitive": false
+        },
+        {
+            "name": "Token ID",
+            "description": "BookStack API Token ID",
+            "envVar": "BOOKSTACK_TOKEN_ID",
+            "sensitive": true
+        },
+        {
+            "name": "Token Secret",
+            "description": "BookStack API Token Secret",
+            "envVar": "BOOKSTACK_TOKEN_SECRET",
+            "sensitive": true
+        },
+        {
+            "name": "Enable Write",
+            "description": "Set to \"true\" to enable write operations, \"false\" for read-only",
+            "envVar": "BOOKSTACK_ENABLE_WRITE",
+            "sensitive": false
+        },
+        {
+            "name": "Ignore Certificate Errors",
+            "description": "Set to \"true\" to skip SSL certificate validation (useful for LAN/self-signed certs)",
+            "envVar": "BOOKSTACK_INSECURE_SKIP_TLS_VERIFY",
+            "sensitive": false
+        }
+    ]
+}
