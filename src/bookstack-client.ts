@@ -222,19 +222,14 @@ export class BookStackClient {
     return `${this.baseUrl}/search?term=${encodedQuery}`;
   }
 
-  // Enhanced response helpers
+  // Enhanced response helpers. Each one adds only `url` on top of the raw
+  // BookStack record — narrated/duplicate fields (direct_link, *_friendly,
+  // content_info, summary, location, etc.) were removed to shrink the MCP
+  // payload; the LLM can derive them from the raw fields when needed.
   private enhanceBookResponse(book: Book): any {
-    const lastUpdated = this.formatDate(book.updated_at);
-    const created = this.formatDate(book.created_at);
-    
     return {
       ...book,
-      url: this.generateBookUrl(book),
-      direct_link: `[${book.name}](${this.generateBookUrl(book)})`,
-      last_updated_friendly: lastUpdated,
-      created_friendly: created,
-      summary: book.description ? `${book.description.substring(0, 100)}${book.description.length > 100 ? '...' : ''}` : 'No description available',
-      content_info: `Book created ${created}, last updated ${lastUpdated}`
+      url: this.generateBookUrl(book)
     };
   }
 
@@ -243,8 +238,6 @@ export class BookStackClient {
     offset?: number;
     limit?: number;
   }): Promise<any> {
-    const lastUpdated = this.formatDate(page.updated_at);
-    const created = this.formatDate(page.created_at);
     const url = await this.generatePageUrl(page);
 
     // Pick a single content format to return to avoid 3x duplication (html + markdown + text)
@@ -270,58 +263,27 @@ export class BookStackClient {
     return {
       ...pageMeta,
       url,
-      direct_link: `[${page.name}](${url})`,
-      last_updated_friendly: lastUpdated,
-      created_friendly: created,
-      content_info: `Page created ${created}, last updated ${lastUpdated}`,
       word_count: page.text ? page.text.split(' ').length : 0,
-      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`,
       content_format: format,
       content_total_chars: totalChars,
       content_offset: offset,
       content_returned_chars: slice.length,
       content_truncated: truncated,
       content_next_offset: truncated ? nextOffset : null,
-      pagination_hint: truncated
-        ? `Only ${nextOffset}/${totalChars} characters returned. Call get_page again with offset=${nextOffset} to continue, or pass a larger limit.`
-        : undefined,
       content: slice
     };
   }
 
   private async enhanceChapterResponse(chapter: Chapter): Promise<any> {
-    const lastUpdated = this.formatDate(chapter.updated_at);
-    const created = this.formatDate(chapter.created_at);
     const url = await this.generateChapterUrl(chapter);
-
-    return {
-      ...chapter,
-      url,
-      direct_link: `[${chapter.name}](${url})`,
-      last_updated_friendly: lastUpdated,
-      created_friendly: created,
-      summary: chapter.description ? `${chapter.description.substring(0, 100)}${chapter.description.length > 100 ? '...' : ''}` : 'No description available',
-      content_info: `Chapter created ${created}, last updated ${lastUpdated}`,
-      location: `In Book ID ${chapter.book_id}`
-    };
+    return { ...chapter, url };
   }
 
   private enhanceShelfResponse(shelf: Shelf): any {
-    const lastUpdated = this.formatDate(shelf.updated_at);
-    const created = this.formatDate(shelf.created_at);
-    const bookCount = shelf.books?.length || 0;
-    
     return {
       ...shelf,
       url: this.generateShelfUrl(shelf),
-      direct_link: `[${shelf.name}](${this.generateShelfUrl(shelf)})`,
-      last_updated_friendly: lastUpdated,
-      created_friendly: created,
-      summary: shelf.description ? `${shelf.description.substring(0, 100)}${shelf.description.length > 100 ? '...' : ''}` : 'No description available',
-      content_info: `Shelf with ${bookCount} book${bookCount !== 1 ? 's' : ''}, created ${created}, last updated ${lastUpdated}`,
-      book_count: bookCount,
-      books: shelf.books?.map(book => this.enhanceBookResponse(book)),
-      tags_summary: shelf.tags?.length ? `Tagged with: ${shelf.tags.map(t => `${t.name}${t.value ? `=${t.value}` : ''}`).join(', ')}` : 'No tags'
+      books: shelf.books?.map(book => this.enhanceBookResponse(book))
     };
   }
 
@@ -329,21 +291,19 @@ export class BookStackClient {
     const enhancedResults = await Promise.all(
       results.map(async (result) => {
         const url = await this.generateContentUrl(result);
-        return {
-          ...result,
-          url,
-          direct_link: `[${result.name}](${url})`,
-          content_preview: result.preview_content?.content ? `${result.preview_content.content.substring(0, 150)}${result.preview_content.content.length > 150 ? '...' : ''}` : 'No preview available',
-          content_type: result.type.charAt(0).toUpperCase() + result.type.slice(1),
-          location_info: result.book_id ? `In book ID ${result.book_id}${result.chapter_id ? `, chapter ID ${result.chapter_id}` : ''}` : 'Location unknown'
-        };
+        const preview = result.preview_content?.content;
+        const out: any = { ...result, url };
+        if (preview) {
+          out.content_preview = preview.length > 150 ? `${preview.substring(0, 150)}...` : preview;
+        }
+        return out;
       })
     );
 
     return {
       search_query: originalQuery,
       search_url: this.generateSearchUrl(originalQuery),
-      summary: `Found ${results.length} results for "${originalQuery}"`,
+      total: results.length,
       results: enhancedResults
     };
   }
@@ -476,27 +436,17 @@ export class BookStackClient {
   }
 
   private async enhancePageListItem(page: Page): Promise<any> {
-    const lastUpdated = this.formatDate(page.updated_at);
-    const created = this.formatDate(page.created_at);
     const url = await this.generatePageUrl(page);
-    const preview = page.text
-      ? `${page.text.substring(0, 200)}${page.text.length > 200 ? '...' : ''}`
-      : 'No content preview available';
 
     // List responses from BookStack don't include html/markdown/text/raw_html, but strip
     // defensively and never embed full content here — use get_page for that.
     const { html: _h, markdown: _m, text: _t, raw_html: _r, ...pageMeta } = page as any;
 
-    return {
-      ...pageMeta,
-      url,
-      direct_link: `[${page.name}](${url})`,
-      last_updated_friendly: lastUpdated,
-      created_friendly: created,
-      content_preview: preview,
-      content_info: `Page created ${created}, last updated ${lastUpdated}`,
-      location: `Book ID ${page.book_id}${page.chapter_id ? `, Chapter ID ${page.chapter_id}` : ''}`
-    };
+    const out: any = { ...pageMeta, url };
+    if (page.text) {
+      out.content_preview = page.text.length > 200 ? `${page.text.substring(0, 200)}...` : page.text;
+    }
+    return out;
   }
 
   async getPage(id: number, options?: {
@@ -754,79 +704,27 @@ export class BookStackClient {
     
     const response = await this.client.get('/search', { params });
     const results = response.data.data || response.data;
-    
-    // Enhance results with additional context
+
+    // Use the search response data as-is — no per-item BookStack fetch (was N+1).
+    // Callers can fetch full details via get_page/get_book/get_chapter if needed.
     const enhancedResults = await Promise.all(
       results.map(async (result: SearchResult) => {
-        let contextualInfo = '';
-        let contentPreview = result.preview_content?.content || '';
-        
-        try {
-          // Get additional context based on content type
-          if (result.type === 'page' && result.id) {
-            const fullPage = await this.client.get(`/pages/${result.id}`);
-            const pageData = fullPage.data;
-            contentPreview = pageData.text?.substring(0, 200) || contentPreview;
-            contextualInfo = `Updated in book: ${pageData.book?.name || 'Unknown Book'}`;
-            if (pageData.chapter) {
-              contextualInfo += `, chapter: ${pageData.chapter.name}`;
-            }
-          } else if (result.type === 'book' && result.id) {
-            const fullBook = await this.client.get(`/books/${result.id}`);
-            const bookData = fullBook.data;
-            contentPreview = bookData.description?.substring(0, 200) || 'No description available';
-            contextualInfo = `Book with ${bookData.page_count || 0} pages`;
-          } else if (result.type === 'chapter' && result.id) {
-            const fullChapter = await this.client.get(`/chapters/${result.id}`);
-            const chapterData = fullChapter.data;
-            contentPreview = chapterData.description?.substring(0, 200) || 'No description available';
-            contextualInfo = `Chapter in book: ${chapterData.book?.name || 'Unknown Book'}`;
-          }
-        } catch (error) {
-          // If we can't get additional context, use what we have
-          contextualInfo = `${result.type.charAt(0).toUpperCase() + result.type.slice(1)} content`;
-        }
-
         const url = await this.generateContentUrl(result);
-        return {
-          ...result,
-          url,
-          direct_link: `[${result.name}](${url})`,
-          content_preview: contentPreview ? `${contentPreview}${contentPreview.length >= 200 ? '...' : ''}` : 'No preview available',
-          contextual_info: contextualInfo,
-          last_updated: this.formatDate(result.updated_at || result.created_at || ''),
-          change_summary: `${result.type === 'page' ? 'Page' : result.type === 'book' ? 'Book' : 'Chapter'} "${result.name}" was updated`
-        };
+        const preview = result.preview_content?.content;
+        const out: any = { ...result, url };
+        if (preview) {
+          out.content_preview = preview.length > 200 ? `${preview.substring(0, 200)}...` : preview;
+        }
+        return out;
       })
     );
-    
+
     return {
-      search_query: `Recent changes in the last ${days} days (${type})`,
       date_threshold: dateFilter,
-      search_url: this.generateSearchUrl(searchQuery),
-      total_found: results.length,
-      summary: `Found ${results.length} items updated in the last ${days} days${type !== 'all' ? ` (${type}s only)` : ''}`,
+      type,
+      total: results.length,
       results: enhancedResults
     };
-  }
-
-  private formatDate(dateString: string): string {
-    if (!dateString) return 'Unknown date';
-    
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Less than an hour ago';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) return `${diffInWeeks} weeks ago`;
-    
-    return date.toLocaleDateString();
   }
 
   // Shelves (Book Collections) Management
@@ -914,8 +812,7 @@ export class BookStackClient {
       ...data,
       data: data.data.map((attachment: Attachment) => ({
         ...attachment,
-        page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
-        direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+        download_url: `${this.baseUrl}/attachments/${attachment.id}`
       }))
     };
   }
@@ -923,11 +820,8 @@ export class BookStackClient {
   async getAttachment(id: number): Promise<any> {
     const response = await this.client.get(`/attachments/${id}`);
     const attachment = response.data;
-    
     return {
       ...attachment,
-      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
-      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`,
       download_url: `${this.baseUrl}/attachments/${attachment.id}`
     };
   }
@@ -943,11 +837,9 @@ export class BookStackClient {
     }
     const response = await this.client.post('/attachments', data);
     const attachment = response.data;
-    
     return {
       ...attachment,
-      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
-      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+      download_url: `${this.baseUrl}/attachments/${attachment.id}`
     };
   }
 
@@ -961,11 +853,9 @@ export class BookStackClient {
     }
     const response = await this.client.put(`/attachments/${id}`, data);
     const attachment = response.data;
-    
     return {
       ...attachment,
-      page_url: `${this.baseUrl}/books/${Math.floor(attachment.uploaded_to / 1000)}/page/${attachment.uploaded_to}`,
-      direct_link: `[${attachment.name}](${this.baseUrl}/attachments/${attachment.id})`
+      download_url: `${this.baseUrl}/attachments/${attachment.id}`
     };
   }
 
