@@ -65,7 +65,7 @@ function registerResources(server: McpServer, client: BookStackClient): void {
           resources: (books.data ?? []).map((b: any) => ({
             uri: `bookstack://book/${b.id}`,
             name: b.name,
-            description: b.summary ?? b.description ?? undefined,
+            description: b.description ?? undefined,
             mimeType: "application/json"
           }))
         };
@@ -79,7 +79,6 @@ function registerResources(server: McpServer, client: BookStackClient): void {
       }
     }),
     {
-      title: "BookStack Book",
       description: "A BookStack book exposed as an MCP resource",
       mimeType: "application/json"
     },
@@ -93,7 +92,7 @@ function registerResources(server: McpServer, client: BookStackClient): void {
         contents: [{
           uri: uri.href,
           mimeType: "application/json",
-          text: JSON.stringify(book, null, 2)
+          text: JSON.stringify(book)
         }]
       };
     }
@@ -109,7 +108,7 @@ function registerResources(server: McpServer, client: BookStackClient): void {
           resources: (pages.data ?? []).map((p: any) => ({
             uri: `bookstack://page/${p.id}`,
             name: p.name,
-            description: p.content_preview ?? p.location ?? undefined,
+            description: p.content_preview ?? undefined,
             mimeType: "text/markdown"
           }))
         };
@@ -123,7 +122,6 @@ function registerResources(server: McpServer, client: BookStackClient): void {
       }
     }),
     {
-      title: "BookStack Page",
       description: "A BookStack page exposed as an MCP resource (markdown content)",
       mimeType: "text/markdown"
     },
@@ -148,10 +146,10 @@ function registerResources(server: McpServer, client: BookStackClient): void {
             chapter_id: page.chapter_id,
             url: page.url,
             word_count: page.word_count,
-            last_updated_friendly: page.last_updated_friendly,
+            updated_at: page.updated_at,
             content_truncated: page.content_truncated,
             content_total_chars: page.content_total_chars
-          }, null, 2)
+          })
         }]
       };
     }
@@ -167,44 +165,18 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   const writeTool: typeof server.registerTool = ((name: string, cfg: any, handler: any) =>
     server.registerTool(name, { ...cfg, annotations: { ...WRITE_ANNOTATIONS, ...(cfg.annotations ?? {}) } }, handler)) as any;
 
-  // Register read-only tools
-  readTool(
-    "get_capabilities",
-    {
-      title: "Get BookStack Capabilities",
-      description: "Get information about available BookStack MCP capabilities and current configuration",
-      inputSchema: {}
-    },
-    async () => {
-      const capabilities = {
-        server_name: "BookStack MCP Server",
-        version: PKG_VERSION,
-        write_operations_enabled: config.enableWrite,
-        available_tools: config.enableWrite ? "All tools enabled" : "Read-only tools only",
-        security_note: config.enableWrite
-          ? "⚠️  Write operations are ENABLED - AI can create and modify BookStack content"
-          : "🛡️  Read-only mode - Safe for production use"
-      };
-      return {
-        content: [{ type: "text", text: JSON.stringify(capabilities, null, 2) }]
-      };
-    }
-  );
-
+  // Register read-only tools.
+  // Common params (offset/count/sort/filter/id) are self-describing and intentionally
+  // bare so tool definitions stay compact in the MCP tools/list payload.
   readTool(
     "search_content",
     {
-      title: "Search BookStack Content",
-      description: "Search across BookStack content with contextual previews and location info. Supports BookStack's advanced search syntax — see the query parameter for caveats.",
+      description: "Search BookStack content. Supports advanced syntax like {type:page} or {book_id:5}. {created_by:X}/{updated_by:X}/{owned_by:X} need a numeric user ID — use find_users to resolve names.",
       inputSchema: {
-        query: z.string().describe(
-          "Search query. Supports BookStack advanced search syntax like {type:page} or {book_id:5}. " +
-          "Caveat: {created_by:X}, {updated_by:X}, and {owned_by:X} require a numeric user ID — pass a name and BookStack silently ignores the filter, returning the unfiltered query. " +
-          "Use the find_users tool to resolve names to IDs."
-        ),
-        type: z.enum(["book", "page", "chapter", "bookshelf"]).optional().describe("Filter by content type"),
-        count: z.coerce.number().max(500).optional().describe("Number of results to return (max 500)"),
-        offset: z.coerce.number().optional().describe("Number of results to skip for pagination")
+        query: z.string(),
+        type: z.enum(["book", "page", "chapter", "bookshelf"]).optional(),
+        count: z.coerce.number().max(500).optional(),
+        offset: z.coerce.number().optional()
       }
     },
     async (args) => {
@@ -213,26 +185,19 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         count: args.count,
         offset: args.offset
       });
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }]
-      };
+      return { content: [{ type: "text", text: JSON.stringify(results) }] };
     }
   );
 
   readTool(
     "search_pages",
     {
-      title: "Search Pages",
-      description: "Search specifically for pages with optional book filtering. Same advanced-search caveats as search_content — see the query parameter.",
+      description: "Search BookStack pages, optionally within a book. Same user-ID caveat as search_content.",
       inputSchema: {
-        query: z.string().describe(
-          "Search query for pages. Supports BookStack advanced search syntax. " +
-          "Caveat: {created_by:X}, {updated_by:X}, and {owned_by:X} require a numeric user ID — pass a name and BookStack silently ignores the filter. " +
-          "Use the find_users tool to resolve names to IDs."
-        ),
-        book_id: z.coerce.number().optional().describe("Filter results to pages within a specific book"),
-        count: z.coerce.number().max(500).optional().describe("Number of results to return"),
-        offset: z.coerce.number().optional().describe("Pagination offset")
+        query: z.string(),
+        book_id: z.coerce.number().optional(),
+        count: z.coerce.number().max(500).optional(),
+        offset: z.coerce.number().optional()
       }
     },
     async (args) => {
@@ -241,22 +206,19 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         count: args.count,
         offset: args.offset
       });
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }]
-      };
+      return { content: [{ type: "text", text: JSON.stringify(results) }] };
     }
   );
 
   readTool(
     "get_books",
     {
-      title: "List Books",
-      description: "List available books with advanced filtering and sorting",
+      description: "List books with optional filter/sort.",
       inputSchema: {
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field (e.g., 'name', '-created_at', 'updated_at')"),
-        filter: z.record(z.any()).optional().describe("Filter criteria")
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional(),
+        filter: z.record(z.any()).optional()
       }
     },
     async (args) => {
@@ -267,7 +229,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         filter: args.filter
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(books, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(books) }]
       };
     }
   );
@@ -275,16 +237,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_book",
     {
-      title: "Get Book Details",
-      description: "Get detailed information about a specific book",
+      description: "Get a book.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Book ID")
+        id: z.coerce.number().min(1)
       }
     },
     async (args) => {
       const book = await client.getBook(args.id);
       return {
-        content: [{ type: "text", text: JSON.stringify(book, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(book) }]
       };
     }
   );
@@ -292,15 +253,14 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_pages",
     {
-      title: "List Pages",
-      description: "List pages with content previews, word counts, and contextual information",
+      description: "List pages with previews.",
       inputSchema: {
-        book_id: z.coerce.number().optional().describe("Filter by book ID"),
-        chapter_id: z.coerce.number().optional().describe("Filter by chapter ID"),
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field"),
-        filter: z.record(z.any()).optional().describe("Additional filter criteria")
+        book_id: z.coerce.number().optional(),
+        chapter_id: z.coerce.number().optional(),
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional(),
+        filter: z.record(z.any()).optional()
       }
     },
     async (args) => {
@@ -313,7 +273,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         filter: args.filter
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(pages, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(pages) }]
       };
     }
   );
@@ -321,10 +281,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_page",
     {
-      title: "Get Page Content",
-      description: "Get content of a specific page. Returns one content format (default markdown) and supports character-range pagination so large pages don't blow the context window. Use offset/limit or the returned content_next_offset to page through long content.",
+      description: "Get a page. Returns one format (default markdown); use offset/limit + content_next_offset to paginate large pages.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Page ID"),
+        id: z.coerce.number().min(1),
         format: z.enum(["markdown", "html", "text"]).optional().describe("Which content format to return. Defaults to markdown."),
         offset: z.coerce.number().min(0).optional().describe("Character offset into the content to start from (default 0)"),
         limit: z.coerce.number().min(1).max(200000).optional().describe("Max characters of content to return (default 50000)")
@@ -337,7 +296,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         limit: args.limit
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(page, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(page) }]
       };
     }
   );
@@ -345,18 +304,17 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_chapters",
     {
-      title: "List Chapters",
-      description: "List chapters, optionally filtered by book",
+      description: "List chapters; optional book_id.",
       inputSchema: {
-        book_id: z.coerce.number().optional().describe("Filter by book ID"),
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().default(50).describe("Number of results to return")
+        book_id: z.coerce.number().optional(),
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().default(50)
       }
     },
     async (args) => {
       const chapters = await client.getChapters(args.book_id, args.offset, args.count);
       return {
-        content: [{ type: "text", text: JSON.stringify(chapters, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(chapters) }]
       };
     }
   );
@@ -364,16 +322,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_chapter",
     {
-      title: "Get Chapter Details",
-      description: "Get details of a specific chapter",
+      description: "Get a chapter.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Chapter ID")
+        id: z.coerce.number().min(1)
       }
     },
     async (args) => {
       const chapter = await client.getChapter(args.id);
       return {
-        content: [{ type: "text", text: JSON.stringify(chapter, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(chapter) }]
       };
     }
   );
@@ -381,34 +338,20 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "export_page",
     {
-      title: "Export Page",
-      description: "Export a page in various formats (PDF/ZIP provide direct BookStack download URLs)",
+      description: "Export a page (PDF/ZIP return download URL).",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Page ID"),
-        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"]).describe("Export format")
+        id: z.coerce.number().min(1),
+        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"])
       }
     },
     async (args) => {
       const content = await client.exportPage(args.id, args.format);
 
-      // Handle binary formats with direct URLs
-      if (typeof content === 'object' && content.download_url && content.direct_download) {
-        const format = args.format.toUpperCase();
-        return {
-          content: [{
-            type: "text",
-            text: `✅ **${format} Export Ready**\n\n` +
-                  `📄 **Page:** ${content.page_name}\n` +
-                  `📚 **Book:** ${content.book_name}\n` +
-                  `📁 **File:** ${content.filename}\n\n` +
-                  `🚀 **Direct Download Link:**\n${content.download_url}\n\n` +
-                  `ℹ️  **Note:** ${content.note}`
-          }]
-        };
+      if (typeof content === 'object' && content.download_url) {
+        return { content: [{ type: "text", text: JSON.stringify(content) }] };
       }
 
-      // Handle text formats
-      const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      const text = typeof content === 'string' ? content : JSON.stringify(content);
       return {
         content: [{ type: "text", text }]
       };
@@ -418,31 +361,20 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "export_book",
     {
-      title: "Export Book",
-      description: "Export an entire book in various formats",
+      description: "Export a book.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Book ID"),
-        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"]).describe("Export format")
+        id: z.coerce.number().min(1),
+        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"])
       }
     },
     async (args) => {
       const content = await client.exportBook(args.id, args.format);
 
       if (typeof content === 'object' && content.download_url) {
-        const format = args.format.toUpperCase();
-        return {
-          content: [{
-            type: "text",
-            text: `✅ **${format} Book Export Ready**\n\n` +
-                  `📚 **Book:** ${content.book_name}\n` +
-                  `📁 **File:** ${content.filename}\n\n` +
-                  `🚀 **Direct Download Link:**\n${content.download_url}\n\n` +
-                  `ℹ️  **Note:** ${content.note}`
-          }]
-        };
+        return { content: [{ type: "text", text: JSON.stringify(content) }] };
       }
 
-      const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      const text = typeof content === 'string' ? content : JSON.stringify(content);
       return {
         content: [{ type: "text", text }]
       };
@@ -452,32 +384,20 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "export_chapter",
     {
-      title: "Export Chapter",
-      description: "Export a chapter in various formats",
+      description: "Export a chapter.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Chapter ID"),
-        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"]).describe("Export format")
+        id: z.coerce.number().min(1),
+        format: z.enum(["html", "pdf", "markdown", "plaintext", "zip"])
       }
     },
     async (args) => {
       const content = await client.exportChapter(args.id, args.format);
 
       if (typeof content === 'object' && content.download_url) {
-        const format = args.format.toUpperCase();
-        return {
-          content: [{
-            type: "text",
-            text: `✅ **${format} Chapter Export Ready**\n\n` +
-                  `📖 **Chapter:** ${content.chapter_name}\n` +
-                  `📚 **Book:** ${content.book_name}\n` +
-                  `📁 **File:** ${content.filename}\n\n` +
-                  `🚀 **Direct Download Link:**\n${content.download_url}\n\n` +
-                  `ℹ️  **Note:** ${content.note}`
-          }]
-        };
+        return { content: [{ type: "text", text: JSON.stringify(content) }] };
       }
 
-      const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      const text = typeof content === 'string' ? content : JSON.stringify(content);
       return {
         content: [{ type: "text", text }]
       };
@@ -487,12 +407,11 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_recent_changes",
     {
-      title: "Get Recent Changes",
-      description: "Get recently updated content with contextual previews and change descriptions",
+      description: "List content updated in the last N days.",
       inputSchema: {
-        type: z.enum(["all", "page", "book", "chapter"]).default("all").describe("Filter by content type"),
-        limit: z.coerce.number().max(100).default(20).describe("Number of recent items to return"),
-        days: z.coerce.number().default(30).describe("Number of days back to look for changes")
+        type: z.enum(["all", "page", "book", "chapter"]).default("all"),
+        limit: z.coerce.number().max(100).default(20),
+        days: z.coerce.number().default(30)
       }
     },
     async (args) => {
@@ -502,7 +421,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         days: args.days
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(changes, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(changes) }]
       };
     }
   );
@@ -510,13 +429,12 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_shelves",
     {
-      title: "List Shelves",
-      description: "List available book shelves (collections) with filtering and sorting",
+      description: "List shelves (book collections).",
       inputSchema: {
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field"),
-        filter: z.record(z.any()).optional().describe("Filter criteria")
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional(),
+        filter: z.record(z.any()).optional()
       }
     },
     async (args) => {
@@ -527,7 +445,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         filter: args.filter
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(shelves, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(shelves) }]
       };
     }
   );
@@ -535,16 +453,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_shelf",
     {
-      title: "Get Shelf Details",
-      description: "Get details of a specific book shelf including all books",
+      description: "Get a shelf including its books.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Shelf ID")
+        id: z.coerce.number().min(1)
       }
     },
     async (args) => {
       const shelf = await client.getShelf(args.id);
       return {
-        content: [{ type: "text", text: JSON.stringify(shelf, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(shelf) }]
       };
     }
   );
@@ -552,13 +469,12 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_attachments",
     {
-      title: "List Attachments",
-      description: "List attachments (files and links) with filtering and sorting",
+      description: "List attachments (files and links).",
       inputSchema: {
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field"),
-        filter: z.record(z.any()).optional().describe("Filter criteria")
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional(),
+        filter: z.record(z.any()).optional()
       }
     },
     async (args) => {
@@ -569,7 +485,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         filter: args.filter
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(attachments, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(attachments) }]
       };
     }
   );
@@ -577,16 +493,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_attachment",
     {
-      title: "Get Attachment Details",
-      description: "Get details of a specific attachment including download links",
+      description: "Get an attachment with download_url.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Attachment ID")
+        id: z.coerce.number().min(1)
       }
     },
     async (args) => {
       const attachment = await client.getAttachment(args.id);
       return {
-        content: [{ type: "text", text: JSON.stringify(attachment, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(attachment) }]
       };
     }
   );
@@ -594,13 +509,12 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_comments",
     {
-      title: "List Comments",
-      description: "List comments, optionally filtered to a single page. Requires BookStack v25.11+.",
+      description: "List comments (optional page_id). BookStack v25.11+.",
       inputSchema: {
-        page_id: z.coerce.number().optional().describe("Filter to comments on this page"),
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field")
+        page_id: z.coerce.number().optional(),
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional()
       }
     },
     async (args) => {
@@ -611,7 +525,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         sort: args.sort
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(comments, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(comments) }]
       };
     }
   );
@@ -619,16 +533,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_comment",
     {
-      title: "Get Comment",
-      description: "Get a single comment by ID. Requires BookStack v25.11+.",
+      description: "Get a comment. BookStack v25.11+.",
       inputSchema: {
-        id: z.coerce.number().min(1).describe("Comment ID")
+        id: z.coerce.number().min(1)
       }
     },
     async (args) => {
       const comment = await client.getComment(args.id);
       return {
-        content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(comment) }]
       };
     }
   );
@@ -636,15 +549,14 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "find_users",
     {
-      title: "Find Users",
-      description: "List BookStack users with optional filtering by name, email, or slug. Use this to resolve a person's name into the numeric user ID needed for {created_by:X}/{updated_by:X}/{owned_by:X} search filters and for the filter parameter on get_pages, get_books, etc. Requires admin permissions on the API token.",
+      description: "List users; filter by name/email/slug (partial match). Resolves names to numeric user IDs for {created_by:X}/{updated_by:X}/{owned_by:X} search filters. Requires admin token.",
       inputSchema: {
-        name: z.string().optional().describe("Filter by user display name (partial match)"),
-        email: z.string().optional().describe("Filter by email address (partial match)"),
-        slug: z.string().optional().describe("Filter by URL slug (e.g. \"jane-doe\")"),
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field (e.g. 'name', '-created_at')")
+        name: z.string().optional(),
+        email: z.string().optional(),
+        slug: z.string().optional(),
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional()
       }
     },
     async (args) => {
@@ -659,7 +571,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         filter: Object.keys(filter).length ? filter : undefined
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(users, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(users) }]
       };
     }
   );
@@ -667,12 +579,11 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "get_recycle_bin",
     {
-      title: "List Recycle Bin",
-      description: "List items in the recycle bin (deleted books, chapters, pages, shelves). Requires admin permissions on the API token.",
+      description: "List recycle-bin items. Admin token required.",
       inputSchema: {
-        offset: z.coerce.number().default(0).describe("Pagination offset"),
-        count: z.coerce.number().max(500).default(50).describe("Number of results to return"),
-        sort: z.string().optional().describe("Sort field")
+        offset: z.coerce.number().default(0),
+        count: z.coerce.number().max(500).default(50),
+        sort: z.string().optional()
       }
     },
     async (args) => {
@@ -682,7 +593,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         sort: args.sort
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(items, null, 2) }]
+        content: [{ type: "text", text: JSON.stringify(items) }]
       };
     }
   );
@@ -692,7 +603,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_book",
       {
-        title: "Create Book",
         description: "Create a new book in BookStack",
         inputSchema: {
           name: z.string().describe("Book name"),
@@ -710,7 +620,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           tags: args.tags as any
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(book, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(book) }]
         };
       }
     );
@@ -718,7 +628,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_chapter",
       {
-        title: "Create Chapter",
         description: "Create a new chapter within a book",
         inputSchema: {
           book_id: z.coerce.number().min(1).describe("Book ID where the chapter will be created"),
@@ -738,7 +647,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           tags: args.tags as any
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(chapter, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(chapter) }]
         };
       }
     );
@@ -746,7 +655,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_page",
       {
-        title: "Create Page",
         description: "Create a new page in BookStack",
         inputSchema: {
           name: z.string().describe("Page name"),
@@ -765,7 +673,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           markdown: args.markdown
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(page, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(page) }]
         };
       }
     );
@@ -773,10 +681,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "update_page",
       {
-        title: "Update Page",
         description: "Update an existing page. Pass book_id (and optionally chapter_id) to move the page to a different location.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Page ID"),
+          id: z.coerce.number().min(1),
           name: z.string().optional().describe("Optional: New page name"),
           html: z.string().optional().describe("Optional: New HTML content"),
           markdown: z.string().optional().describe("Optional: New Markdown content"),
@@ -793,7 +700,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           chapter_id: args.chapter_id
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(page, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(page) }]
         };
       }
     );
@@ -801,7 +708,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_shelf",
       {
-        title: "Create Shelf",
         description: "Create a new book shelf (collection)",
         inputSchema: {
           name: z.string().describe("Shelf name"),
@@ -821,7 +727,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           tags: args.tags as any
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(shelf, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(shelf) }]
         };
       }
     );
@@ -829,10 +735,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "update_shelf",
       {
-        title: "Update Shelf",
         description: "Update an existing book shelf",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Shelf ID"),
+          id: z.coerce.number().min(1),
           name: z.string().optional().describe("New shelf name"),
           description: z.string().optional().describe("New shelf description"),
           books: z.array(z.coerce.number()).optional().describe("Array of book IDs"),
@@ -850,7 +755,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           tags: args.tags as any
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(shelf, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(shelf) }]
         };
       }
     );
@@ -858,16 +763,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_shelf",
       {
-        title: "Delete Shelf",
         description: "Delete a book shelf (collection)",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Shelf ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deleteShelf(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -875,7 +779,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_attachment",
       {
-        title: "Create Attachment",
         description: "Create a new link attachment to a page",
         inputSchema: {
           name: z.string().describe("Attachment name"),
@@ -890,7 +793,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           link: args.link
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(attachment, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(attachment) }]
         };
       }
     );
@@ -898,10 +801,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "update_attachment",
       {
-        title: "Update Attachment",
         description: "Update an existing attachment",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Attachment ID"),
+          id: z.coerce.number().min(1),
           name: z.string().optional().describe("New attachment name"),
           link: z.string().optional().describe("New URL for link attachment"),
           uploaded_to: z.coerce.number().optional().describe("Move attachment to different page")
@@ -914,7 +816,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           uploaded_to: args.uploaded_to
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(attachment, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(attachment) }]
         };
       }
     );
@@ -922,16 +824,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_attachment",
       {
-        title: "Delete Attachment",
         description: "Delete an attachment",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Attachment ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deleteAttachment(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -939,16 +840,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_book",
       {
-        title: "Delete Book",
         description: "Delete a book. Goes to the recycle bin and can be restored from there.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Book ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deleteBook(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -956,16 +856,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_chapter",
       {
-        title: "Delete Chapter",
         description: "Delete a chapter. Goes to the recycle bin and can be restored from there.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Chapter ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deleteChapter(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -973,16 +872,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_page",
       {
-        title: "Delete Page",
         description: "Delete a page. Goes to the recycle bin and can be restored from there.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Page ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deletePage(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -990,7 +888,6 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "create_comment",
       {
-        title: "Create Comment",
         description: "Add a comment to a page. Pass parent_id to reply to an existing comment. Requires BookStack v25.11+.",
         inputSchema: {
           page_id: z.coerce.number().min(1).describe("Page ID to comment on"),
@@ -1007,7 +904,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           content_ref: args.content_ref
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(comment) }]
         };
       }
     );
@@ -1015,10 +912,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "update_comment",
       {
-        title: "Update Comment",
         description: "Edit a comment's body or archive/unarchive it. Requires BookStack v25.11+.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Comment ID"),
+          id: z.coerce.number().min(1),
           html: z.string().optional().describe("Optional: new HTML body"),
           archived: z.boolean().optional().describe("Optional: archive (true) or unarchive (false) the comment")
         }
@@ -1029,7 +925,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           archived: args.archived
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(comment) }]
         };
       }
     );
@@ -1037,16 +933,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "delete_comment",
       {
-        title: "Delete Comment",
         description: "Delete a comment. Requires BookStack v25.11+.",
         inputSchema: {
-          id: z.coerce.number().min(1).describe("Comment ID")
+          id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.deleteComment(args.id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -1054,16 +949,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "restore_deleted",
       {
-        title: "Restore from Recycle Bin",
         description: "Restore a deleted item from the recycle bin. Use the deletion ID from get_recycle_bin (not the original entity ID). Requires admin permissions.",
         inputSchema: {
-          deletion_id: z.coerce.number().min(1).describe("Deletion ID (from get_recycle_bin)")
+          deletion_id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.restoreFromRecycleBin(args.deletion_id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );
@@ -1071,16 +965,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "permanently_delete",
       {
-        title: "Permanently Delete from Recycle Bin",
         description: "PERMANENTLY destroys a deleted item — this cannot be undone. Use the deletion ID from get_recycle_bin. Requires admin permissions.",
         inputSchema: {
-          deletion_id: z.coerce.number().min(1).describe("Deletion ID (from get_recycle_bin)")
+          deletion_id: z.coerce.number().min(1)
         }
       },
       async (args) => {
         const result = await client.destroyFromRecycleBin(args.deletion_id);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(result) }]
         };
       }
     );

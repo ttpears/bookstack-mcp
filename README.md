@@ -23,6 +23,7 @@ npx bookstack-mcp
 - Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
 - Embedded URLs and content previews in all responses
 - Markdown export fallback for HTML-authored pages, so AI clients always get usable content
+- Token-efficient responses: compact JSON, no redundant fields, no N+1 fetches — ~30–55% smaller payloads than 3.x
 - Write operations disabled by default for safety
 - Works with Claude Desktop, Claude Code, LibreChat, and any MCP-compatible client
 - Stdio and Streamable HTTP transports
@@ -214,13 +215,14 @@ Books and pages are also exposed as MCP resources, so clients that browse resour
 
 Both templates support `id` autocompletion: as you type, the server searches BookStack and returns matching IDs so you don't have to remember numeric IDs by hand.
 
+> **4.0.0 breaking changes:** tool responses were trimmed for token efficiency. Removed fields: `direct_link`, `*_friendly` date strings, `content_info`, `contextual_info`, `change_summary`, `pagination_hint`, `location`, `summary`/`tags_summary`/`book_count` on shelves, and the buggy `page_url` on attachments. Use `url`, the ISO date fields, and `download_url` instead. The `get_capabilities` tool was removed — clients should use `tools/list` (built into MCP). Responses are now compact JSON (no pretty-printing) and `get_recent_changes` no longer issues per-result fetches.
+
 ## Available Tools
 
 ### Read Operations (always available)
 
 | Tool | Description |
 |------|-------------|
-| `get_capabilities` | Server capabilities and configuration |
 | `search_content` | Search across all content with filtering |
 | `search_pages` | Search pages with optional book filtering |
 | `get_books` / `get_book` | List or get details of books |
