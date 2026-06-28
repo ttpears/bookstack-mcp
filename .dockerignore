@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-mcpb
+.git
+.gitignore
+*.md
+docs
+.env*
+.DS_Store
+*.log
+mcpb
+assets
