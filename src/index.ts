@@ -13,6 +13,7 @@ import { z } from "zod";
 import { BookStackClient, BookStackConfig } from "./bookstack-client.js";
 import {
   loadOAuthConfig,
+  initOAuthStore,
   handleOAuthRoutes,
   validateBearer,
   sendUnauthorized,
@@ -1178,6 +1179,11 @@ async function main() {
   const envEnableWrite = process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true';
 
   const oauth = loadOAuthConfig(process.env);
+  // Initialize the OAuth broker-state store (Redis when REDIS_URL is set) before
+  // the server handles any request, so DCR clients / pending flows / codes persist.
+  if (oauth) {
+    await initOAuthStore(process.env, oauth.serverUrl);
+  }
 
   // The read-only credential is required. In OAuth mode it always runs read-only (write is
   // reserved for role-bearing sessions on the separate write token); otherwise the legacy
