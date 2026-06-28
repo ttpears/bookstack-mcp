@@ -13,6 +13,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { KvStore, InMemoryKvStore, createStore } from "./kv-store.js";
 
 export interface OAuthConfig {
   serverUrl: string; // public HTTPS base URL of THIS server, no trailing slash
@@ -87,12 +88,11 @@ export function loadOAuthConfig(env: NodeJS.ProcessEnv): OAuthConfig | null {
   };
 }
 
-// ---- In-memory short-lived stores (single-replica; see spec "State & scaling") ----
+// ---- Broker state store (Redis-backed when REDIS_URL is set; see kv-store) ----
 
 interface RegisteredClient {
   clientId: string;
   redirectUris: string[];
-  createdAt: number;
 }
 
 interface PendingAuth {
@@ -100,7 +100,6 @@ interface PendingAuth {
   clientRedirectUri: string; // where to send the user back (Claude)
   clientState: string; // Claude's state, echoed back
   codeChallenge: string; // Claude's PKCE challenge (S256)
-  createdAt: number;
 }
 
 interface IssuedCode {
@@ -108,22 +107,31 @@ interface IssuedCode {
   clientRedirectUri: string;
   codeChallenge: string;
   tokenResponse: unknown; // the upstream Entra token response, passed through
-  createdAt: number;
 }
 
 const TTL_CLIENT = 1000 * 60 * 60 * 24 * 30; // 30d
 const TTL_PENDING = 1000 * 60 * 10; // 10m
 const TTL_CODE = 1000 * 60 * 5; // 5m
 
-const clients = new Map<string, RegisteredClient>();
-const pending = new Map<string, PendingAuth>(); // keyed by upstream `state`
-const codes = new Map<string, IssuedCode>(); // keyed by our authorization code
+// Default to in-memory; initOAuthStore() upgrades to Redis when REDIS_URL is set.
+// Keys: client:<id>, pending:<state>, code:<code>. TTL handled by the store.
+let store: KvStore = new InMemoryKvStore();
 
-function sweep(): void {
-  const now = Date.now();
-  for (const [k, v] of clients) if (now - v.createdAt > TTL_CLIENT) clients.delete(k);
-  for (const [k, v] of pending) if (now - v.createdAt > TTL_PENDING) pending.delete(k);
-  for (const [k, v] of codes) if (now - v.createdAt > TTL_CODE) codes.delete(k);
+/**
+ * Initialize the broker-state store from the environment. With REDIS_URL set,
+ * broker state (DCR clients, pending flows, issued codes) persists across
+ * redeploys and can be shared by multiple replicas. Call once at startup; keys
+ * are namespaced by issuer host so co-tenant MCPs can share one Redis.
+ */
+export async function initOAuthStore(env: NodeJS.ProcessEnv, serverUrl: string): Promise<void> {
+  let host = "default";
+  try {
+    host = new URL(serverUrl).host;
+  } catch {
+    /* keep default */
+  }
+  const prefix = `${env.REDIS_KEY_PREFIX || "bookstack-mcp"}:${host}`;
+  store = await createStore(env.REDIS_URL, prefix);
 }
 
 // ---- HTTP helpers ----
@@ -224,7 +232,6 @@ export async function handleOAuthRoutes(
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", cfg.serverUrl);
   const path = url.pathname;
-  sweep();
 
   // RFC 9728 — Protected Resource Metadata
   if (path === "/.well-known/oauth-protected-resource") {
@@ -273,7 +280,7 @@ export async function handleOAuthRoutes(
       return true;
     }
     const clientId = `mcp-${randomUUID()}`;
-    clients.set(clientId, { clientId, redirectUris, createdAt: Date.now() });
+    await store.set<RegisteredClient>(`client:${clientId}`, { clientId, redirectUris }, TTL_CLIENT);
     sendJson(res, 201, {
       client_id: clientId,
       redirect_uris: redirectUris,
@@ -293,7 +300,7 @@ export async function handleOAuthRoutes(
     const codeChallenge = q.get("code_challenge") ?? "";
     const method = q.get("code_challenge_method") ?? "";
 
-    const client = clients.get(clientId);
+    const client = await store.get<RegisteredClient>(`client:${clientId}`);
     if (!client) {
       sendJson(res, 400, { error: "invalid_client" });
       return true;
@@ -308,13 +315,12 @@ export async function handleOAuthRoutes(
     }
 
     const upstreamState = randomBytes(24).toString("base64url");
-    pending.set(upstreamState, {
+    await store.set<PendingAuth>(`pending:${upstreamState}`, {
       clientId,
       clientRedirectUri: redirectUri,
       clientState,
       codeChallenge,
-      createdAt: Date.now(),
-    });
+    }, TTL_PENDING);
 
     const up = new URL(cfg.authorizeEndpoint);
     up.searchParams.set("client_id", cfg.clientId);
@@ -334,12 +340,12 @@ export async function handleOAuthRoutes(
     const upstreamState = q.get("state") ?? "";
     const code = q.get("code") ?? "";
     const err = q.get("error");
-    const p = pending.get(upstreamState);
+    const p = await store.get<PendingAuth>(`pending:${upstreamState}`);
     if (!p) {
       sendJson(res, 400, { error: "invalid_state" });
       return true;
     }
-    pending.delete(upstreamState);
+    await store.del(`pending:${upstreamState}`);
     if (err || !code) {
       const dest = new URL(p.clientRedirectUri);
       dest.searchParams.set("error", err || "invalid_request");
@@ -373,13 +379,12 @@ export async function handleOAuthRoutes(
     }
 
     const ourCode = randomBytes(32).toString("base64url");
-    codes.set(ourCode, {
+    await store.set<IssuedCode>(`code:${ourCode}`, {
       clientId: p.clientId,
       clientRedirectUri: p.clientRedirectUri,
       codeChallenge: p.codeChallenge,
       tokenResponse: tokenJson,
-      createdAt: Date.now(),
-    });
+    }, TTL_CODE);
 
     const dest = new URL(p.clientRedirectUri);
     dest.searchParams.set("code", ourCode);
@@ -395,12 +400,12 @@ export async function handleOAuthRoutes(
     const grant = form["grant_type"];
 
     if (grant === "authorization_code") {
-      const issued = codes.get(form["code"] ?? "");
+      const issued = await store.get<IssuedCode>(`code:${form["code"] ?? ""}`);
       if (!issued) {
         sendJson(res, 400, { error: "invalid_grant" });
         return true;
       }
-      codes.delete(form["code"]!);
+      await store.del(`code:${form["code"]!}`);
       const verifier = form["code_verifier"] ?? "";
       if (!verifier || s256(verifier) !== issued.codeChallenge) {
         sendJson(res, 400, { error: "invalid_grant", error_description: "PKCE verification failed" });
