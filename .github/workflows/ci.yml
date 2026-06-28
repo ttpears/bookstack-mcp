@@ -19,6 +19,37 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  # Build and push a throwaway GHCR image for every PR so the branch can be
+  # deployed somewhere (e.g. ceres LibreChat) before it ships. Uses the built-in
+  # GITHUB_TOKEN (no PAT) and amd64 only. Tag: branch-<slug>. Never publishes npm.
+  docker-preview:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          slug=$(echo "${GITHUB_HEAD_REF}" | tr '[:upper:]/' '[:lower:]-' | tr -cs 'a-z0-9_.-' '-' | sed 's/^-*//;s/-*$//')
+          echo "tag=branch-${slug}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ttpears/bookstack-mcp:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   tag:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
