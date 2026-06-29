@@ -11,6 +11,23 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { BookStackClient, BookStackConfig } from "./bookstack-client.js";
+import { registerPrompts } from "./prompts.js";
+import {
+  loadOAuthConfig,
+  initOAuthStore,
+  handleOAuthRoutes,
+  validateBearer,
+  sendUnauthorized,
+  OAuthConfig
+} from "./oauth/entra-proxy.js";
+
+// App-level config: the read-only credential is always present; the write credential and
+// OAuth proxy are optional. In OAuth mode the per-session credential is chosen by role.
+interface AppConfig {
+  read: BookStackConfig;
+  write: BookStackConfig | null;
+  oauth: OAuthConfig | null;
+}
 
 const PKG_VERSION: string = (() => {
   try {
@@ -51,6 +68,7 @@ function buildServer(config: BookStackConfig): McpServer {
 
   registerTools(server, client, config);
   registerResources(server, client);
+  registerPrompts(server);
   return server;
 }
 
@@ -981,14 +999,14 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
 
 }
 
-async function startStdio(config: BookStackConfig): Promise<void> {
-  const server = buildServer(config);
+async function startStdio(config: AppConfig): Promise<void> {
+  const server = buildServer(config.read);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("BookStack MCP server running on stdio");
 }
 
-async function startHttp(config: BookStackConfig): Promise<void> {
+async function startHttp(config: AppConfig): Promise<void> {
   const port = parseInt(process.env.MCP_HTTP_PORT ?? "8080", 10);
   const host = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
   const mcpPath = process.env.MCP_HTTP_PATH ?? "/mcp";
@@ -1015,6 +1033,8 @@ async function startHttp(config: BookStackConfig): Promise<void> {
   };
 
   const transports: Record<string, StreamableHTTPServerTransport> = {};
+  // Per-session auth binding (OAuth mode only): subject + resolved write status, fixed at init.
+  const sessionAuth: Record<string, { sub?: string; isWriter: boolean }> = {};
 
   const readJsonBody = (req: IncomingMessage): Promise<unknown> =>
     new Promise((resolve, reject) => {
@@ -1041,11 +1061,27 @@ async function startHttp(config: BookStackConfig): Promise<void> {
         return;
       }
 
+      // OAuth proxy surface (discovery metadata, DCR, authorize/callback/token).
+      if (config.oauth && (await handleOAuthRoutes(req, res, config.oauth))) {
+        return;
+      }
+
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
       const pathname = url.pathname;
 
       // Streamable HTTP endpoint (recommended)
       if (pathname === mcpPath) {
+        // Enforce the bearer and resolve the caller's authorization when OAuth is enabled.
+        let auth: { sub?: string; isWriter: boolean } | null = null;
+        if (config.oauth) {
+          const result = await validateBearer(req, config.oauth);
+          if (!result.ok) {
+            sendUnauthorized(res, config.oauth);
+            return;
+          }
+          auth = { sub: result.sub, isWriter: !!result.isWriter };
+        }
+
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
         let transport: StreamableHTTPServerTransport | undefined;
         let parsedBody: unknown;
@@ -1055,19 +1091,35 @@ async function startHttp(config: BookStackConfig): Promise<void> {
         }
 
         if (sessionId && transports[sessionId]) {
+          // Reject a valid token belonging to a different subject than the session was bound to.
+          if (config.oauth && sessionAuth[sessionId] && auth?.sub !== sessionAuth[sessionId].sub) {
+            sendJson(res, 403, {
+              jsonrpc: "2.0",
+              error: { code: -32003, message: "Forbidden: token does not match session" },
+              id: null
+            });
+            return;
+          }
           transport = transports[sessionId];
         } else if (!sessionId && req.method === "POST" && isInitializeRequest(parsedBody)) {
+          // Choose the per-session credential: writers (with a write token configured) get the
+          // write token and write tools; everyone else gets the read-only token.
+          const useWrite = !!(auth?.isWriter && config.write);
+          const sessionConfig = useWrite ? config.write! : config.read;
+
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sid) => {
               transports[sid] = transport!;
+              if (config.oauth && auth) sessionAuth[sid] = auth;
             }
           });
           transport.onclose = () => {
             const sid = transport!.sessionId;
             if (sid && transports[sid]) delete transports[sid];
+            if (sid && sessionAuth[sid]) delete sessionAuth[sid];
           };
-          const server = buildServer(config);
+          const server = buildServer(sessionConfig);
           await server.connect(transport);
         } else {
           sendJson(res, 400, {
@@ -1124,18 +1176,51 @@ async function startHttp(config: BookStackConfig): Promise<void> {
 }
 
 async function main() {
-  const config: BookStackConfig = {
-    baseUrl: getRequiredEnvVar('BOOKSTACK_BASE_URL'),
+  const baseUrl = getRequiredEnvVar('BOOKSTACK_BASE_URL');
+  const insecureSkipTlsVerify = process.env.BOOKSTACK_INSECURE_SKIP_TLS_VERIFY?.toLowerCase() === 'true';
+  const envEnableWrite = process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true';
+
+  const oauth = loadOAuthConfig(process.env);
+  // Initialize the OAuth broker-state store (Redis when REDIS_URL is set) before
+  // the server handles any request, so DCR clients / pending flows / codes persist.
+  if (oauth) {
+    await initOAuthStore(process.env, oauth.serverUrl);
+  }
+
+  // The read-only credential is required. In OAuth mode it always runs read-only (write is
+  // reserved for role-bearing sessions on the separate write token); otherwise the legacy
+  // BOOKSTACK_ENABLE_WRITE flag governs it.
+  const read: BookStackConfig = {
+    baseUrl,
     tokenId: getRequiredEnvVar('BOOKSTACK_TOKEN_ID'),
     tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
-    enableWrite: process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true',
-    insecureSkipTlsVerify: process.env.BOOKSTACK_INSECURE_SKIP_TLS_VERIFY?.toLowerCase() === 'true'
+    enableWrite: oauth ? false : envEnableWrite,
+    insecureSkipTlsVerify
   };
 
+  // The write credential is optional and only used by the OAuth proxy for sessions whose
+  // token carries the configured app role.
+  const writeTokenId = process.env.BOOKSTACK_WRITE_TOKEN_ID;
+  const writeTokenSecret = process.env.BOOKSTACK_WRITE_TOKEN_SECRET;
+  const write: BookStackConfig | null = (writeTokenId && writeTokenSecret)
+    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify }
+    : null;
+
+  const config: AppConfig = { read, write, oauth };
+
   console.error('Initializing BookStack MCP Server...');
-  console.error(`BookStack URL: ${config.baseUrl}`);
-  console.error(`Write operations: ${config.enableWrite ? 'ENABLED' : 'DISABLED'}`);
-  if (config.insecureSkipTlsVerify) {
+  console.error(`BookStack URL: ${baseUrl}`);
+  if (oauth) {
+    console.error(`Auth: Entra OAuth proxy ENABLED (tenant ${oauth.tenantId})`);
+    console.error(`  Public URL: ${oauth.serverUrl}`);
+    console.error(`  Write role: ${oauth.writeRole}`);
+    if (!write) {
+      console.error('  WARNING: no BOOKSTACK_WRITE_TOKEN_ID/SECRET set — all sessions are read-only regardless of role.');
+    }
+  } else {
+    console.error(`Auth: none (token-only mode); Write operations: ${read.enableWrite ? 'ENABLED' : 'DISABLED'}`);
+  }
+  if (insecureSkipTlsVerify) {
     console.error('WARNING: TLS certificate verification is DISABLED (BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true). Connections to BookStack are vulnerable to MITM attacks. Use only with trusted self-signed certs on a trusted network.');
   }
 

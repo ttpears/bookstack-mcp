@@ -1,6 +1,6 @@
 {
   "name": "bookstack-mcp",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "MCP server for BookStack wiki — search, read, create, and manage documentation via AI assistants",
   "type": "module",
   "bin": {
@@ -42,6 +42,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
     "axios": "^1.6.0",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

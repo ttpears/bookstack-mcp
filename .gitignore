@@ -129,3 +129,5 @@ Thumbs.db
 
 # Local scripts with credentials
 start-mcp.sh
+# Internal AI-session design docs
+docs/superpowers/

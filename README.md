@@ -144,6 +144,17 @@ When binding to `0.0.0.0` (e.g. inside a container reachable from other services
 
 Restart LibreChat after config changes.
 
+### Remote hosting & Claude Connector (Docker + Entra OAuth)
+
+A container image is published to `ghcr.io/ttpears/bookstack-mcp` (released `:X.Y.Z`/`:latest`,
+plus per-PR preview tags `:branch-<slug>`). The server can run as a public **Claude Connector**
+gated by Microsoft 365 / Entra ID login — users sign in, no API key or client credential to
+paste; write tools are unlocked per session by an Entra app role.
+
+See **[docs/SETUP.md](docs/SETUP.md)** for the full runbook: Entra app registration steps,
+the environment-variable reference, internal LibreChat deployment, and the public OAuth
+connector setup.
+
 ### Claude Code (CLI)
 
 The recommended path is the `ttpears/claude-plugins` marketplace, which ships this repo's plugin manifest (`.claude-plugin/plugin.json`):
