@@ -20,7 +20,7 @@ jobs:
       - run: npm run build
 
   # Build and push a throwaway GHCR image for every PR so the branch can be
-  # deployed somewhere (e.g. ceres LibreChat) before it ships. Uses the built-in
+  # deployed somewhere (e.g. an internal LibreChat host) before it ships. Uses the built-in
   # GITHUB_TOKEN (no PAT) and amd64 only. Tag: branch-<slug>. Never publishes npm.
   docker-preview:
     needs: build

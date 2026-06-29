@@ -2,16 +2,14 @@
 
 How to run `bookstack-mcp` as a remote server: as an internal MCP for LibreChat
 (no auth, Docker-internal) and as a public **Claude Connector** gated by Microsoft
-365 / Entra ID login (OAuth proxy). See
-[the design spec](superpowers/specs/2026-06-27-bookstack-mcp-m365-oauth-connector-design.md)
-for the architecture.
+365 / Entra ID login (OAuth proxy).
 
 ## Modes at a glance
 
 | Mode | When | `MCP_TRANSPORT` | `MCP_OAUTH_ENABLE` | Auth |
 |---|---|---|---|---|
 | stdio | local desktop client | `stdio` (default) | — | none |
-| HTTP, no auth | internal (LibreChat on `ceres`) | `http` | unset | trusted Docker network |
+| HTTP, no auth | internal (self-hosted LibreChat) | `http` | unset | trusted Docker network |
 | HTTP + Entra OAuth | public Claude Connector | `http` | `true` | M365 login; per-session token by role |
 
 ## Container image (GHCR)
@@ -20,10 +18,10 @@ Published to `ghcr.io/ttpears/bookstack-mcp`:
 
 - Released tags: `:X.Y.Z`, `:X.Y`, `:latest` (built on `v*` git tags by `release.yml`).
 - **Preview tags: `:branch-<slug>`** — built for every PR by `ci.yml` so a branch can be
-  pulled and tested on `ceres` before it ships. The slug is the lowercased head-ref with
+  pulled and tested on your LibreChat host before it ships. The slug is the lowercased head-ref with
   `/` → `-` (e.g. branch `feat/m365-oauth-connector` → `ghcr.io/ttpears/bookstack-mcp:branch-feat-m365-oauth-connector`).
 
-Pulling on `ceres` (GHCR packages are private by default — either make the package public
+Pulling on your internal Docker host (GHCR packages are private by default — either make the package public
 in the repo's Packages settings, or authenticate once):
 
 ```bash
@@ -57,7 +55,7 @@ non-writer session is physically bound to the read-only credential.
 | `MCP_HTTP_HOST` / `MCP_HTTP_PORT` | no | container image defaults to `0.0.0.0:8080` |
 | `MCP_HTTP_ALLOWED_HOSTS` | no | DNS-rebind allowlist; set to your public host for defense-in-depth |
 | `MCP_OAUTH_ENABLE` | no | `true` enables the Entra OAuth proxy |
-| `MCP_SERVER_URL` | OAuth | public HTTPS base URL, no trailing slash (e.g. `https://bookstack-mcp.teamgleim.com`) |
+| `MCP_SERVER_URL` | OAuth | public HTTPS base URL, no trailing slash (e.g. `https://bookstack-mcp.example.com`) |
 | `MCP_TRUST_PROXY` | OAuth (behind proxy) | `true` to read `X-Forwarded-*` |
 | `OAUTH_TENANT_ID` | OAuth | Entra Directory (tenant) ID |
 | `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | OAuth | the Entra app registration |
@@ -76,7 +74,7 @@ Do this once per public connector host. Requires an Entra admin. Portal:
    - Name: `BookStack MCP Connector`.
    - Supported account types: **Accounts in this organizational directory only (single tenant)**.
    - Redirect URI: platform **Web**, value `https://<MCP_SERVER_URL>/callback`
-     (e.g. `https://bookstack-mcp.teamgleim.com/callback`).
+     (e.g. `https://bookstack-mcp.example.com/callback`).
    - Register.
 
 2. **Record IDs** (Overview page):
@@ -114,12 +112,12 @@ enter a key or client credential** — they just sign in.
 
 ---
 
-## Part B — Test on ceres via LibreChat (internal, no auth)
+## Part B — Test on your LibreChat host (internal, no auth)
 
 Fastest way to validate the tools. LibreChat reaches the MCP over the internal `librechat`
 Docker network, exactly like `mediawiki-mcp`. No OAuth here.
 
-1. Add a service alongside LibreChat (`ceres:/srv/docker/LibreChat/docker-compose.override.yml`
+1. Add a service alongside LibreChat (your LibreChat host's `docker-compose.override.yml`
    or the project compose), on the shared `librechat` network:
 
    ```yaml
@@ -130,7 +128,7 @@ Docker network, exactly like `mediawiki-mcp`. No OAuth here.
          MCP_TRANSPORT: "http"
          MCP_HTTP_HOST: "0.0.0.0"
          MCP_HTTP_PORT: "8080"
-         BOOKSTACK_BASE_URL: "https://wiki.teamgleim.com"
+         BOOKSTACK_BASE_URL: "https://wiki.example.com"
          BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID}"
          BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET}"
          TZ: America/New_York
@@ -142,7 +140,7 @@ Docker network, exactly like `mediawiki-mcp`. No OAuth here.
        external: true
    ```
 
-2. Register it in `ceres:/srv/docker/LibreChat/librechat.yaml`:
+2. Register it in your LibreChat host's `librechat.yaml`:
 
    ```yaml
    mcpServers:
@@ -176,13 +174,13 @@ services:
       MCP_HTTP_HOST: "0.0.0.0"
       MCP_HTTP_PORT: "8080"
       MCP_OAUTH_ENABLE: "true"
-      MCP_SERVER_URL: "https://bookstack-mcp.teamgleim.com"
+      MCP_SERVER_URL: "https://bookstack-mcp.example.com"
       MCP_TRUST_PROXY: "true"
       OAUTH_TENANT_ID: "${OAUTH_TENANT_ID}"
       OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID}"
       OAUTH_CLIENT_SECRET: "${OAUTH_CLIENT_SECRET}"
       OAUTH_WRITE_ROLE: "Writer"
-      BOOKSTACK_BASE_URL: "https://wiki.teamgleim.com"
+      BOOKSTACK_BASE_URL: "https://wiki.example.com"
       BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID}"
       BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET}"
       BOOKSTACK_WRITE_TOKEN_ID: "${BOOKSTACK_WRITE_TOKEN_ID}"
@@ -193,17 +191,17 @@ services:
 ```
 
 Then add it in Claude (Settings → Connectors → Add custom connector) with URL
-`https://bookstack-mcp.teamgleim.com/mcp`. Claude self-registers (DCR), sends the user to the
+`https://bookstack-mcp.example.com/mcp`. Claude self-registers (DCR), sends the user to the
 M365 login, and connects — no client ID/secret to paste. Writers (Entra `Writer` role) get the
 write tools; everyone else is read-only.
 
 ### Verifying the OAuth surface
 
 ```bash
-curl -s https://bookstack-mcp.teamgleim.com/.well-known/oauth-protected-resource
-curl -s https://bookstack-mcp.teamgleim.com/.well-known/oauth-authorization-server
+curl -s https://bookstack-mcp.example.com/.well-known/oauth-protected-resource
+curl -s https://bookstack-mcp.example.com/.well-known/oauth-authorization-server
 # Unauthenticated /mcp must return 401 with a WWW-Authenticate: Bearer ... resource_metadata hint:
-curl -si -X POST https://bookstack-mcp.teamgleim.com/mcp \
+curl -si -X POST https://bookstack-mcp.example.com/mcp \
   -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"initialize","id":1}' | grep -i www-authenticate
 ```
 
