@@ -233,6 +233,15 @@ export async function handleOAuthRoutes(
   const url = new URL(req.url ?? "/", cfg.serverUrl);
   const path = url.pathname;
 
+  if (["/register", "/authorize", "/callback", "/token"].includes(path)) {
+    console.error(
+      `[oauth] ${req.method} ${path}` +
+        (path === "/callback"
+          ? ` error=${url.searchParams.get("error") ?? ""} code=${url.searchParams.get("code") ? "yes" : "no"} state=${url.searchParams.get("state") ? "yes" : "no"}`
+          : "")
+    );
+  }
+
   // RFC 9728 — Protected Resource Metadata
   if (path === "/.well-known/oauth-protected-resource") {
     sendJson(res, 200, {
@@ -368,8 +377,11 @@ export async function handleOAuthRoutes(
         scope: cfg.scopes,
       }),
     });
-    const tokenJson = await tokenRes.json().catch(() => null);
-    if (!tokenRes.ok || !tokenJson) {
+    const rawTok = await tokenRes.text();
+    let tokenJson: any = null;
+    try { tokenJson = JSON.parse(rawTok); } catch { /* non-JSON */ }
+    if (!tokenRes.ok || !tokenJson || !tokenJson.access_token) {
+      console.error(`[oauth] /callback Entra token exchange FAILED: status=${tokenRes.status} body=${rawTok.slice(0, 600)}`);
       const dest = new URL(p.clientRedirectUri);
       dest.searchParams.set("error", "server_error");
       if (p.clientState) dest.searchParams.set("state", p.clientState);
@@ -377,6 +389,7 @@ export async function handleOAuthRoutes(
       res.end();
       return true;
     }
+    console.error("[oauth] /callback Entra token exchange OK; issuing client code");
 
     const ourCode = randomBytes(32).toString("base64url");
     await store.set<IssuedCode>(`code:${ourCode}`, {
@@ -402,19 +415,23 @@ export async function handleOAuthRoutes(
     if (grant === "authorization_code") {
       const issued = await store.get<IssuedCode>(`code:${form["code"] ?? ""}`);
       if (!issued) {
+        console.error("[oauth] /token authorization_code: invalid_grant (code not found/expired)");
         sendJson(res, 400, { error: "invalid_grant" });
         return true;
       }
       await store.del(`code:${form["code"]!}`);
       const verifier = form["code_verifier"] ?? "";
       if (!verifier || s256(verifier) !== issued.codeChallenge) {
+        console.error(`[oauth] /token authorization_code: PKCE FAILED (verifier=${verifier ? "present" : "missing"})`);
         sendJson(res, 400, { error: "invalid_grant", error_description: "PKCE verification failed" });
         return true;
       }
       if (form["client_id"] && form["client_id"] !== issued.clientId) {
+        console.error(`[oauth] /token authorization_code: client mismatch (got=${form["client_id"]} want=${issued.clientId})`);
         sendJson(res, 400, { error: "invalid_client" });
         return true;
       }
+      console.error("[oauth] /token authorization_code: OK (returning Entra token to client)");
       sendJson(res, 200, issued.tokenResponse);
       return true;
     }
