@@ -11,6 +11,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { BookStackClient, BookStackConfig } from "./bookstack-client.js";
+import { registerPrompts } from "./prompts.js";
 import {
   loadOAuthConfig,
   initOAuthStore,
@@ -67,6 +68,7 @@ function buildServer(config: BookStackConfig): McpServer {
 
   registerTools(server, client, config);
   registerResources(server, client);
+  registerPrompts(server);
   return server;
 }
 
