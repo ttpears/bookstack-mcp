@@ -189,7 +189,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "search_content",
     {
-      description: "Search BookStack content. Supports advanced syntax like {type:page} or {book_id:5}. {created_by:X}/{updated_by:X}/{owned_by:X} need a numeric user ID — use find_users to resolve names.",
+      description: "Search BookStack content. Supports advanced syntax like {type:page} or {book_id:5}. {created_by:X}/{updated_by:X}/{owned_by:X} take a user slug or 'me' — use find_users to resolve names to slugs.",
       inputSchema: {
         query: z.string(),
         type: z.enum(["book", "page", "chapter", "bookshelf"]).optional(),
@@ -567,7 +567,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
   readTool(
     "find_users",
     {
-      description: "List users; filter by name/email/slug (partial match). Resolves names to numeric user IDs for {created_by:X}/{updated_by:X}/{owned_by:X} search filters. Requires admin token.",
+      description: "List users; filter by name/email/slug (partial match). Resolves names to user slugs for {created_by:X}/{updated_by:X}/{owned_by:X} search filters. Requires admin token.",
       inputSchema: {
         name: z.string().optional(),
         email: z.string().optional(),
