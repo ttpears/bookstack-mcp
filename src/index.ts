@@ -1179,6 +1179,9 @@ async function main() {
   const baseUrl = getRequiredEnvVar('BOOKSTACK_BASE_URL');
   const insecureSkipTlsVerify = process.env.BOOKSTACK_INSECURE_SKIP_TLS_VERIFY?.toLowerCase() === 'true';
   const envEnableWrite = process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true';
+  const timeoutRaw = process.env.BOOKSTACK_TIMEOUT_MS;
+  const timeoutParsed = timeoutRaw ? parseInt(timeoutRaw, 10) : NaN;
+  const timeoutMs = Number.isFinite(timeoutParsed) && timeoutParsed > 0 ? timeoutParsed : undefined;
 
   const oauth = loadOAuthConfig(process.env);
   // Initialize the OAuth broker-state store (Redis when REDIS_URL is set) before
@@ -1195,7 +1198,8 @@ async function main() {
     tokenId: getRequiredEnvVar('BOOKSTACK_TOKEN_ID'),
     tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
     enableWrite: oauth ? false : envEnableWrite,
-    insecureSkipTlsVerify
+    insecureSkipTlsVerify,
+    timeoutMs
   };
 
   // The write credential is optional and only used by the OAuth proxy for sessions whose
@@ -1203,7 +1207,7 @@ async function main() {
   const writeTokenId = process.env.BOOKSTACK_WRITE_TOKEN_ID;
   const writeTokenSecret = process.env.BOOKSTACK_WRITE_TOKEN_SECRET;
   const write: BookStackConfig | null = (writeTokenId && writeTokenSecret)
-    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify }
+    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs }
     : null;
 
   const config: AppConfig = { read, write, oauth };

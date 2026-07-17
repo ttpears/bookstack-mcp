@@ -34,7 +34,12 @@ export interface BookStackConfig {
   tokenSecret: string;
   enableWrite?: boolean;
   insecureSkipTlsVerify?: boolean;
+  /** Per-request HTTP timeout in ms. Bounds a slow/hung BookStack response so a
+   *  call fails cleanly instead of hanging until the MCP client gives up. */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 30000;
 
 export interface Book {
   id: number;
@@ -144,12 +149,18 @@ export class BookStackClient {
   private enableWrite: boolean;
   private baseUrl: string;
   private bookSlugCache: Map<number, string> = new Map();
+  // In-flight single-book lookups, keyed by id, so concurrent callers for the
+  // same book share one request instead of stampeding BookStack.
+  private inflightBookSlug: Map<number, Promise<string>> = new Map();
+  // Memoized one-shot bulk warm of the slug cache (see warmBookSlugCache).
+  private bookSlugWarm?: Promise<void>;
 
   constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
     this.baseUrl = config.baseUrl;
     this.client = axios.create({
       baseURL: `${config.baseUrl}/api`,
+      timeout: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       headers: {
         'Authorization': `Token ${config.tokenId}:${config.tokenSecret}`,
         'Content-Type': 'application/json'
@@ -181,21 +192,67 @@ export class BookStackClient {
     }
   }
 
-  private async getBookSlug(bookId: number): Promise<string> {
-    // Check cache first
-    if (this.bookSlugCache.has(bookId)) {
-      return this.bookSlugCache.get(bookId)!;
-    }
+  /**
+   * Populate the book-slug cache from a single bulk `/books` listing, once per
+   * client lifetime. Enhancing a result set resolves a slug per item; without a
+   * warm cache a search whose results span (or even share) many books fires a
+   * concurrent `GET /books/{id}` per item — a cache stampede that BookStack
+   * rate-limits (429), and the retrying requests pile up in memory until the
+   * process OOMs. Memoized on `bookSlugWarm` so concurrent callers await one
+   * warm. Failure is non-fatal: getBookSlug falls back to a lazy single fetch.
+   */
+  private async warmBookSlugCache(): Promise<void> {
+    if (this.bookSlugWarm) return this.bookSlugWarm;
+    this.bookSlugWarm = (async () => {
+      const pageSize = 500;
+      const maxPages = 20; // safety cap (10k books) — huge wikis fall back to lazy fills
+      try {
+        for (let page = 0; page < maxPages; page++) {
+          const response = await this.client.get('/books', {
+            params: { count: pageSize, offset: page * pageSize }
+          });
+          const books: Book[] = response.data?.data ?? [];
+          for (const book of books) {
+            if (book?.id != null) this.bookSlugCache.set(book.id, book.slug || String(book.id));
+          }
+          if (books.length < pageSize) break;
+        }
+      } catch {
+        // Non-fatal: leave the cache partially warm; getBookSlug lazily fills gaps.
+      }
+    })();
+    return this.bookSlugWarm;
+  }
 
-    try {
-      const response = await this.client.get(`/books/${bookId}`);
-      const slug = response.data.slug || String(bookId);
-      this.bookSlugCache.set(bookId, slug);
-      return slug;
-    } catch (error) {
-      // Fallback to ID if book fetch fails
-      return String(bookId);
-    }
+  private async getBookSlug(bookId: number): Promise<string> {
+    // A single bulk warm turns the per-result N+1 into +1; after it, every book
+    // that existed at warm time is a cache hit.
+    await this.warmBookSlugCache();
+
+    const cached = this.bookSlugCache.get(bookId);
+    if (cached !== undefined) return cached;
+
+    // Gap (book created after warm, or beyond the warm cap): lazily fetch it, but
+    // share one in-flight request across concurrent callers so a batch of results
+    // referencing the same new book can't stampede.
+    const inflight = this.inflightBookSlug.get(bookId);
+    if (inflight) return inflight;
+
+    const request = (async () => {
+      try {
+        const response = await this.client.get(`/books/${bookId}`);
+        const slug = response.data.slug || String(bookId);
+        this.bookSlugCache.set(bookId, slug);
+        return slug;
+      } catch (error) {
+        // Fallback to ID if book fetch fails
+        return String(bookId);
+      } finally {
+        this.inflightBookSlug.delete(bookId);
+      }
+    })();
+    this.inflightBookSlug.set(bookId, request);
+    return request;
   }
 
   // URL generation utilities
@@ -705,8 +762,10 @@ export class BookStackClient {
     const response = await this.client.get('/search', { params });
     const results = response.data.data || response.data;
 
-    // Use the search response data as-is — no per-item BookStack fetch (was N+1).
-    // Callers can fetch full details via get_page/get_book/get_chapter if needed.
+    // Use the search response data as-is — callers fetch full details via
+    // get_page/get_book/get_chapter if needed. URL enhancement resolves a book
+    // slug per item, but getBookSlug bulk-warms its cache once, so this is +1
+    // request, not the per-item N+1 it would otherwise be.
     const enhancedResults = await Promise.all(
       results.map(async (result: SearchResult) => {
         const url = await this.generateContentUrl(result);
