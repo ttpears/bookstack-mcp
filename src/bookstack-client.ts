@@ -144,16 +144,44 @@ export interface ListResponse<T> {
   total: number;
 }
 
+// How long a completed bulk warm stays fresh before the next lookup re-sweeps
+// `/books` (books get created/renamed). Gaps within the window are handled by
+// the lazy per-id fetch in getBookSlug.
+const SLUG_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface SlugCacheEntry {
+  cache: Map<number, string>;
+  // In-flight single-book lookups, keyed by id, so concurrent callers for the
+  // same book share one request instead of stampeding BookStack.
+  inflight: Map<number, Promise<string>>;
+  // The in-progress bulk warm (present only while one is running), so concurrent
+  // callers await one warm instead of each sweeping /books.
+  warm?: Promise<void>;
+  // When the last warm completed (ms); undefined until the first warm finishes.
+  warmedAt?: number;
+}
+
+// Process-wide slug caches keyed by BookStack base URL. The book-id -> slug
+// mapping is identical for every caller of the same BookStack instance
+// regardless of which API token is used, so sharing it across the per-session
+// BookStackClient instances (index.ts builds one per MCP session) turns a
+// per-session bulk warm into one warm per process per TTL — far fewer /books
+// calls against the single, rate-limited (180/min) shared service token.
+const slugCaches: Map<string, SlugCacheEntry> = new Map();
+
+function getSlugCacheEntry(baseUrl: string): SlugCacheEntry {
+  let entry = slugCaches.get(baseUrl);
+  if (!entry) {
+    entry = { cache: new Map(), inflight: new Map() };
+    slugCaches.set(baseUrl, entry);
+  }
+  return entry;
+}
+
 export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
   private baseUrl: string;
-  private bookSlugCache: Map<number, string> = new Map();
-  // In-flight single-book lookups, keyed by id, so concurrent callers for the
-  // same book share one request instead of stampeding BookStack.
-  private inflightBookSlug: Map<number, Promise<string>> = new Map();
-  // Memoized one-shot bulk warm of the slug cache (see warmBookSlugCache).
-  private bookSlugWarm?: Promise<void>;
 
   constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
@@ -193,17 +221,27 @@ export class BookStackClient {
   }
 
   /**
-   * Populate the book-slug cache from a single bulk `/books` listing, once per
-   * client lifetime. Enhancing a result set resolves a slug per item; without a
-   * warm cache a search whose results span (or even share) many books fires a
+   * Populate the process-wide book-slug cache from a single bulk `/books`
+   * listing. Enhancing a result set resolves a slug per item; without a warm
+   * cache a search whose results span (or even share) many books fires a
    * concurrent `GET /books/{id}` per item — a cache stampede that BookStack
    * rate-limits (429), and the retrying requests pile up in memory until the
-   * process OOMs. Memoized on `bookSlugWarm` so concurrent callers await one
-   * warm. Failure is non-fatal: getBookSlug falls back to a lazy single fetch.
+   * process OOMs. The warm is shared across all client instances for this base
+   * URL (see slugCaches) and re-runs at most once per SLUG_CACHE_TTL_MS, so
+   * many MCP sessions cost one sweep, not one each. Concurrent callers await the
+   * single in-flight warm. Failure is non-fatal: getBookSlug lazily fills gaps.
    */
   private async warmBookSlugCache(): Promise<void> {
-    if (this.bookSlugWarm) return this.bookSlugWarm;
-    this.bookSlugWarm = (async () => {
+    const entry = getSlugCacheEntry(this.baseUrl);
+
+    // A completed warm is still fresh → nothing to do (lazy fetch covers gaps).
+    if (entry.warmedAt !== undefined && Date.now() - entry.warmedAt < SLUG_CACHE_TTL_MS) {
+      return;
+    }
+    // A warm is already running → join it instead of starting another sweep.
+    if (entry.warm) return entry.warm;
+
+    entry.warm = (async () => {
       const pageSize = 500;
       const maxPages = 20; // safety cap (10k books) — huge wikis fall back to lazy fills
       try {
@@ -213,45 +251,52 @@ export class BookStackClient {
           });
           const books: Book[] = response.data?.data ?? [];
           for (const book of books) {
-            if (book?.id != null) this.bookSlugCache.set(book.id, book.slug || String(book.id));
+            if (book?.id != null) entry.cache.set(book.id, book.slug || String(book.id));
           }
           if (books.length < pageSize) break;
         }
       } catch {
         // Non-fatal: leave the cache partially warm; getBookSlug lazily fills gaps.
+      } finally {
+        // Stamp on completion (success or caught failure) so a broken BookStack
+        // can't trigger a warm-storm; clear the in-flight promise so the next
+        // lookup after the TTL can re-sweep.
+        entry.warmedAt = Date.now();
+        entry.warm = undefined;
       }
     })();
-    return this.bookSlugWarm;
+    return entry.warm;
   }
 
   private async getBookSlug(bookId: number): Promise<string> {
     // A single bulk warm turns the per-result N+1 into +1; after it, every book
-    // that existed at warm time is a cache hit.
+    // that existed at warm time is a cache hit — shared across all sessions.
     await this.warmBookSlugCache();
 
-    const cached = this.bookSlugCache.get(bookId);
+    const entry = getSlugCacheEntry(this.baseUrl);
+    const cached = entry.cache.get(bookId);
     if (cached !== undefined) return cached;
 
     // Gap (book created after warm, or beyond the warm cap): lazily fetch it, but
     // share one in-flight request across concurrent callers so a batch of results
     // referencing the same new book can't stampede.
-    const inflight = this.inflightBookSlug.get(bookId);
+    const inflight = entry.inflight.get(bookId);
     if (inflight) return inflight;
 
     const request = (async () => {
       try {
         const response = await this.client.get(`/books/${bookId}`);
         const slug = response.data.slug || String(bookId);
-        this.bookSlugCache.set(bookId, slug);
+        entry.cache.set(bookId, slug);
         return slug;
       } catch (error) {
         // Fallback to ID if book fetch fails
         return String(bookId);
       } finally {
-        this.inflightBookSlug.delete(bookId);
+        entry.inflight.delete(bookId);
       }
     })();
-    this.inflightBookSlug.set(bookId, request);
+    entry.inflight.set(bookId, request);
     return request;
   }
 
