@@ -463,19 +463,27 @@ export class BookStackClient {
     offset?: number;
   }): Promise<any> {
     validateUserIdFilters(query);
-    let searchQuery = `{type:page} ${query}`.trim();
+    const searchQuery = `{type:page} ${query}`.trim();
+    const bookId = options?.bookId;
+    const wanted = options?.count ? Math.min(options.count, 500) : undefined;
 
-    // Add book filtering if specified
-    if (options?.bookId) {
-      searchQuery = `{book_id:${options.bookId}} ${searchQuery}`;
-    }
-
+    // BookStack search has NO book-scoping filter token — `{book_id:X}` is
+    // silently ignored (it returned the whole wiki), so scoping was a no-op that
+    // leaked other books' pages. Instead over-fetch and filter client-side on
+    // book_id. Best-effort: matches ranked beyond the 500-result ceiling can be
+    // missed, but every returned result genuinely belongs to the requested book.
     const params: any = { query: searchQuery };
-    if (options?.count) params.count = Math.min(options.count, 500);
+    params.count = bookId ? 500 : wanted;
+    if (params.count === undefined) delete params.count;
     if (options?.offset) params.offset = options.offset;
 
     const response = await this.client.get('/search', { params });
-    const results = response.data.data || response.data;
+    let results: SearchResult[] = response.data.data || response.data;
+
+    if (bookId) {
+      results = results.filter((r) => r.book_id === bookId);
+      if (wanted) results = results.slice(0, wanted);
+    }
 
     return await this.enhanceSearchResults(results, query);
   }
@@ -792,18 +800,21 @@ export class BookStackClient {
     dateThreshold.setDate(dateThreshold.getDate() - days);
     const dateFilter = dateThreshold.toISOString().split('T')[0]; // YYYY-MM-DD format
     
-    // Build search query for recent changes
-    let searchQuery = `{updated_at:>=${dateFilter}}`;
+    // Build search query for recent changes. BookStack's search syntax uses
+    // `{updated_after:YYYY-MM-DD}` — NOT `{updated_at:>=...}` (that token does
+    // not exist, and BookStack silently ignores unknown `{...}` filters and
+    // returns the entire wiki). `/search` also does not honor a `sort` query
+    // param (sorting is `{sort_by:...}` in the query), so we sort client-side.
+    let searchQuery = `{updated_after:${dateFilter}}`;
     if (type !== 'all') {
       searchQuery = `{type:${type}} ${searchQuery}`;
     }
-    
+
     const params = {
       query: searchQuery,
-      count: limit,
-      sort: 'updated_at' // Sort by most recently updated
+      count: limit
     };
-    
+
     const response = await this.client.get('/search', { params });
     const results = response.data.data || response.data;
 
@@ -823,10 +834,16 @@ export class BookStackClient {
       })
     );
 
+    // `/search` orders by relevance, not recency, so sort newest-first here.
+    enhancedResults.sort((a, b) =>
+      String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')));
+
     return {
       date_threshold: dateFilter,
       type,
-      total: results.length,
+      // The true match count for the window (results is only the current page).
+      total: response.data.total ?? results.length,
+      returned: enhancedResults.length,
       results: enhancedResults
     };
   }
