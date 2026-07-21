@@ -12,17 +12,21 @@ function parseRetryAfter(value: unknown): number | null {
   return null;
 }
 
-// BookStack's advanced search silently ignores {created_by:X}/{updated_by:X}/{owned_by:X}
-// when X isn't a numeric user ID — the query falls back to unfiltered results, which is
-// a confusing footgun. Reject the bad form up front and point the caller at find_users.
+// BookStack resolves {created_by:X}/{updated_by:X}/{owned_by:X} by user SLUG, with 'me'
+// as a shortcut for the token's own user, and silently SKIPS the filter when X matches no
+// user's slug — the query falls back to unfiltered results, which is a confusing footgun
+// (SearchRunner::filterCreatedBy et al. look users up by slug only). A numeric user ID is
+// the classic way to hit it, so reject that form up front and point the caller at
+// find_users for the slug.
 function validateUserIdFilters(query: string): void {
-  const re = /\{(created_by|updated_by|owned_by):([^}\s]+)\}/g;
+  const re = /\{(!?)(created_by|updated_by|owned_by):([^}\s]+)\}/g;
   for (const match of query.matchAll(re)) {
-    const [, field, value] = match;
-    if (!/^\d+$/.test(value)) {
+    const [, neg, field, value] = match;
+    if (/^\d+$/.test(value)) {
       throw new Error(
-        `Search filter {${field}:${value}} requires a numeric user ID, not "${value}". ` +
-        `Use the find_users tool to look up a user's ID by name, email, or slug.`
+        `Search filter {${neg}${field}:${value}} takes a user slug or 'me', not a numeric user ID — ` +
+        `BookStack resolves these filters by slug and silently returns unfiltered results for ` +
+        `unmatched values. Use the find_users tool to look up a user's slug by name or email.`
       );
     }
   }
