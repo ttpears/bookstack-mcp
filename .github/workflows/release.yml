@@ -16,13 +16,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22: `npm install -g npm@latest` below pulls npm 12.x, which
+          # requires Node >= 22.22 — on Node 20 it failed with EBADENGINE and
+          # aborted the publish (the container image built regardless).
+          node-version: 22
           cache: npm
 
       - run: npm ci
       - run: npm run build
 
-      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 ships with npm 10.x
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node ships with npm 10.x
       - run: npm install -g npm@latest
 
       - name: Publish to npm with provenance
