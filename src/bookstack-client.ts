@@ -39,8 +39,9 @@ export interface BookStackConfig {
    *  call fails cleanly instead of hanging until the MCP client gives up. */
   timeoutMs?: number;
   /** Max concurrent in-flight HTTP requests to BookStack, process-wide per base
-   *  URL. Bounds parallel bursts so the shared token can't blow past BookStack's
-   *  per-token rate limit (default 180/min). Default 4. */
+   *  URL. Bounds concurrent requests to smooth out parallel bursts (the pattern
+   *  that triggers 429 storms). This complements, does not replace, the 429
+   *  backoff/retry; it does not itself cap the request rate. Default 4. */
   maxConcurrency?: number;
 }
 
