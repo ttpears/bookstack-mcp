@@ -1,18 +1,26 @@
 {
   "name": "bookstack-mcp",
   "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
-  "version": "5.2.3",
+  "version": "5.3.0",
   "author": {
     "name": "Tim Pearson"
   },
   "homepage": "https://github.com/ttpears/bookstack-mcp",
   "repository": "https://github.com/ttpears/bookstack-mcp",
   "license": "MIT",
-  "keywords": ["mcp", "bookstack", "wiki", "documentation"],
+  "keywords": [
+    "mcp",
+    "bookstack",
+    "wiki",
+    "documentation"
+  ],
   "mcpServers": {
     "bookstack": {
       "command": "npx",
-      "args": ["-y", "bookstack-mcp"]
+      "args": [
+        "-y",
+        "bookstack-mcp"
+      ]
     }
   }
 }
