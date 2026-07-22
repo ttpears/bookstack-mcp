@@ -1,5 +1,6 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosAdapter } from 'axios';
 import https from 'https';
+import { Semaphore } from './util/semaphore.js';
 
 const MAX_RETRIES_429 = 5;
 
@@ -37,6 +38,10 @@ export interface BookStackConfig {
   /** Per-request HTTP timeout in ms. Bounds a slow/hung BookStack response so a
    *  call fails cleanly instead of hanging until the MCP client gives up. */
   timeoutMs?: number;
+  /** Max concurrent in-flight HTTP requests to BookStack, process-wide per base
+   *  URL. Bounds parallel bursts so the shared token can't blow past BookStack's
+   *  per-token rate limit (default 180/min). Default 4. */
+  maxConcurrency?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -178,6 +183,22 @@ function getSlugCacheEntry(baseUrl: string): SlugCacheEntry {
   return entry;
 }
 
+const DEFAULT_MAX_CONCURRENCY = 4;
+
+// Process-wide concurrency limiters, one per BookStack base URL — shared across
+// all sessions/clients so they cannot collectively exceed the per-token rate
+// limit. Mirrors the slugCaches sharing model.
+const concurrencyLimiters: Map<string, Semaphore> = new Map();
+
+function getConcurrencyLimiter(baseUrl: string, max: number): Semaphore {
+  let limiter = concurrencyLimiters.get(baseUrl);
+  if (!limiter) {
+    limiter = new Semaphore(max);
+    concurrencyLimiters.set(baseUrl, limiter);
+  }
+  return limiter;
+}
+
 export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
@@ -186,6 +207,12 @@ export class BookStackClient {
   constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
     this.baseUrl = config.baseUrl;
+    const limiter = getConcurrencyLimiter(
+      config.baseUrl,
+      config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY
+    );
+    const baseAdapter: AxiosAdapter = axios.getAdapter(axios.defaults.adapter);
+
     this.client = axios.create({
       baseURL: `${config.baseUrl}/api`,
       timeout: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -195,7 +222,12 @@ export class BookStackClient {
       },
       httpsAgent: config.insecureSkipTlsVerify
         ? new https.Agent({ rejectUnauthorized: false })
-        : undefined
+        : undefined,
+      // Every request — including the 429-retry re-issue below — flows through
+      // this adapter exactly once per HTTP attempt. The retry's backoff sleep
+      // happens in the response interceptor (outside the adapter), so the
+      // permit is released between attempts, not held during the wait.
+      adapter: (requestConfig) => limiter.run(() => baseAdapter(requestConfig)),
     });
 
     this.client.interceptors.response.use(undefined, async (error: AxiosError) => {

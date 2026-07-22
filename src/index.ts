@@ -1183,6 +1183,12 @@ async function main() {
   const timeoutParsed = timeoutRaw ? parseInt(timeoutRaw, 10) : NaN;
   const timeoutMs = Number.isFinite(timeoutParsed) && timeoutParsed > 0 ? timeoutParsed : undefined;
 
+  const concurrencyRaw = process.env.BOOKSTACK_MAX_CONCURRENCY;
+  const concurrencyParsed = concurrencyRaw ? parseInt(concurrencyRaw, 10) : NaN;
+  const maxConcurrency = Number.isFinite(concurrencyParsed) && concurrencyParsed > 0
+    ? concurrencyParsed
+    : undefined;
+
   const oauth = loadOAuthConfig(process.env);
   // Initialize the OAuth broker-state store (Redis when REDIS_URL is set) before
   // the server handles any request, so DCR clients / pending flows / codes persist.
@@ -1199,7 +1205,8 @@ async function main() {
     tokenSecret: getRequiredEnvVar('BOOKSTACK_TOKEN_SECRET'),
     enableWrite: oauth ? false : envEnableWrite,
     insecureSkipTlsVerify,
-    timeoutMs
+    timeoutMs,
+    maxConcurrency
   };
 
   // The write credential is optional and only used by the OAuth proxy for sessions whose
@@ -1207,7 +1214,7 @@ async function main() {
   const writeTokenId = process.env.BOOKSTACK_WRITE_TOKEN_ID;
   const writeTokenSecret = process.env.BOOKSTACK_WRITE_TOKEN_SECRET;
   const write: BookStackConfig | null = (writeTokenId && writeTokenSecret)
-    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs }
+    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs, maxConcurrency }
     : null;
 
   const config: AppConfig = { read, write, oauth };
