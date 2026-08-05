@@ -20,6 +20,7 @@ import {
   sendUnauthorized,
   OAuthConfig
 } from "./oauth/entra-proxy.js";
+import { SessionRegistry } from "./session-registry.js";
 
 // App-level config: the read-only credential is always present; the write credential and
 // OAuth proxy are optional. In OAuth mode the per-session credential is chosen by role.
@@ -1032,9 +1033,15 @@ async function startHttp(config: AppConfig): Promise<void> {
     return allowedHosts.includes(hostname) ? null : `Host '${hostname}' not allowed`;
   };
 
-  const transports: Record<string, StreamableHTTPServerTransport> = {};
-  // Per-session auth binding (OAuth mode only): subject + resolved write status, fixed at init.
-  const sessionAuth: Record<string, { sub?: string; isWriter: boolean }> = {};
+  const idleTtlRaw = process.env.BOOKSTACK_SESSION_IDLE_TTL_MS;
+  const idleTtlParsed = idleTtlRaw ? parseInt(idleTtlRaw, 10) : NaN;
+  const idleTtlMs = Number.isFinite(idleTtlParsed) && idleTtlParsed > 0 ? idleTtlParsed : undefined;
+
+  const maxSessionsRaw = process.env.BOOKSTACK_MAX_SESSIONS;
+  const maxSessionsParsed = maxSessionsRaw ? parseInt(maxSessionsRaw, 10) : NaN;
+  const maxSessions = Number.isFinite(maxSessionsParsed) && maxSessionsParsed > 0 ? maxSessionsParsed : undefined;
+
+  const sessions = new SessionRegistry({ idleTtlMs, maxSessions });
 
   const readJsonBody = (req: IncomingMessage): Promise<unknown> =>
     new Promise((resolve, reject) => {
@@ -1090,9 +1097,10 @@ async function startHttp(config: AppConfig): Promise<void> {
           parsedBody = await readJsonBody(req);
         }
 
-        if (sessionId && transports[sessionId]) {
+        if (sessionId && sessions.has(sessionId)) {
           // Reject a valid token belonging to a different subject than the session was bound to.
-          if (config.oauth && sessionAuth[sessionId] && auth?.sub !== sessionAuth[sessionId].sub) {
+          const boundAuth = sessions.getAuth(sessionId);
+          if (config.oauth && boundAuth && auth?.sub !== boundAuth.sub) {
             sendJson(res, 403, {
               jsonrpc: "2.0",
               error: { code: -32003, message: "Forbidden: token does not match session" },
@@ -1100,8 +1108,17 @@ async function startHttp(config: AppConfig): Promise<void> {
             });
             return;
           }
-          transport = transports[sessionId];
+          transport = sessions.get(sessionId);
         } else if (!sessionId && req.method === "POST" && isInitializeRequest(parsedBody)) {
+          if (sessions.atCapacity()) {
+            sendJson(res, 503, {
+              jsonrpc: "2.0",
+              error: { code: -32000, message: "Server busy: maximum concurrent sessions reached" },
+              id: null
+            });
+            return;
+          }
+
           // Choose the per-session credential: writers (with a write token configured) get the
           // write token and write tools; everyone else gets the read-only token.
           const useWrite = !!(auth?.isWriter && config.write);
@@ -1110,14 +1127,12 @@ async function startHttp(config: AppConfig): Promise<void> {
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sid) => {
-              transports[sid] = transport!;
-              if (config.oauth && auth) sessionAuth[sid] = auth;
+              sessions.register(sid, transport!, config.oauth && auth ? auth : undefined);
             }
           });
           transport.onclose = () => {
             const sid = transport!.sessionId;
-            if (sid && transports[sid]) delete transports[sid];
-            if (sid && sessionAuth[sid]) delete sessionAuth[sid];
+            if (sid) sessions.delete(sid);
           };
           const server = buildServer(sessionConfig);
           await server.connect(transport);
@@ -1136,7 +1151,13 @@ async function startHttp(config: AppConfig): Promise<void> {
 
       // Health check
       if (pathname === "/health" || pathname === "/") {
-        sendJson(res, 200, { status: "ok", server: "bookstack-mcp", transport: "http" });
+        sendJson(res, 200, {
+          status: "ok",
+          server: "bookstack-mcp",
+          transport: "http",
+          sessions: sessions.size(),
+          memoryRssBytes: process.memoryUsage().rss
+        });
         return;
       }
 
@@ -1161,14 +1182,18 @@ async function startHttp(config: AppConfig): Promise<void> {
         ? `  Allowed Host headers: ${allowedHosts.join(", ")}`
         : `  Host header validation: DISABLED (set MCP_HTTP_ALLOWED_HOSTS to enable)`
     );
+    console.error(
+      `  Session limits: idle TTL ${Math.round(sessions.idleTtlMs / 60000)}m, max concurrent ${sessions.maxSessions}`
+    );
   });
 
   const shutdown = async () => {
     console.error("Shutting down HTTP server...");
-    for (const sid of Object.keys(transports)) {
-      try { await transports[sid].close(); } catch {}
-      delete transports[sid];
+    for (const sid of sessions.sessionIds()) {
+      try { await sessions.get(sid)?.close(); } catch {}
+      sessions.delete(sid);
     }
+    sessions.dispose();
     httpServer.close(() => process.exit(0));
   };
   process.on("SIGINT", shutdown);
