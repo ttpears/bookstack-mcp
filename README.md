@@ -17,7 +17,7 @@ npx bookstack-mcp
 
 ## Features
 
-- 20 read-only tools + 18 write tools for complete BookStack API coverage
+- 20 read-only tools + 20 write tools for complete BookStack API coverage
 - Books, chapters, pages, shelves, attachments, and comments — full CRUD
 - Recycle bin support — restore or permanently delete soft-deleted content
 - Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
@@ -253,8 +253,8 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 
 | Tool | Description |
 |------|-------------|
-| `create_book` / `delete_book` | Create or delete a book |
-| `create_chapter` / `delete_chapter` | Create or delete a chapter |
+| `create_book` / `update_book` / `delete_book` | Create, update, or delete a book |
+| `create_chapter` / `update_chapter` / `delete_chapter` | Create, update (including moving to a different book or reordering), or delete a chapter |
 | `create_page` | Create a new page (HTML or Markdown) |
 | `update_page` | Update content, rename, or move to a different book/chapter |
 | `delete_page` | Delete a page (recoverable from recycle bin) |

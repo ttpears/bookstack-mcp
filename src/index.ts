@@ -671,6 +671,62 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     );
 
     writeTool(
+      "update_book",
+      {
+        description: "Update an existing book",
+        inputSchema: {
+          id: z.coerce.number().min(1),
+          name: z.string().optional().describe("New book name"),
+          description: z.string().optional().describe("New book description"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Tags for the book")
+        }
+      },
+      async (args) => {
+        const book = await client.updateBook(args.id, {
+          name: args.name,
+          description: args.description,
+          tags: args.tags as any
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(book) }]
+        };
+      }
+    );
+
+    writeTool(
+      "update_chapter",
+      {
+        description: "Update an existing chapter. Pass book_id to move the chapter to a different book, or priority to reorder it within its book.",
+        inputSchema: {
+          id: z.coerce.number().min(1),
+          name: z.string().optional().describe("New chapter name"),
+          description: z.string().optional().describe("New chapter description"),
+          book_id: z.coerce.number().min(1).optional().describe("Optional: Move chapter to this book"),
+          priority: z.coerce.number().optional().describe("Optional: Reorder chapter within its book (lower sorts first)"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Tags for the chapter")
+        }
+      },
+      async (args) => {
+        const chapter = await client.updateChapter(args.id, {
+          name: args.name,
+          description: args.description,
+          book_id: args.book_id,
+          priority: args.priority,
+          tags: args.tags as any
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(chapter) }]
+        };
+      }
+    );
+
+    writeTool(
       "create_page",
       {
         description: "Create a new page in BookStack",
