@@ -705,7 +705,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           name: z.string().optional().describe("New chapter name"),
           description: z.string().optional().describe("New chapter description"),
           book_id: z.coerce.number().min(1).optional().describe("Optional: Move chapter to this book"),
-          priority: z.coerce.number().optional().describe("Optional: Reorder chapter within its book (lower sorts first)"),
+          priority: z.coerce.number().int().min(0).optional().describe("Optional: Reorder chapter within its book (non-negative integer, lower sorts first)"),
           tags: z.array(z.object({
             name: z.string(),
             value: z.string()
