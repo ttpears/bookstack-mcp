@@ -49,10 +49,16 @@ export class SessionRegistry {
     this.sweep.unref?.();
   }
 
+  /** Closes the transport (best-effort) before dropping it from bookkeeping, mirroring shutdown(). */
+  private evict(sessionId: string): void {
+    this.transports[sessionId]?.close().catch(() => {});
+    this.delete(sessionId);
+  }
+
   private sweepExpired(): void {
     const now = Date.now();
     for (const sid of Object.keys(this.transports)) {
-      if (now - (this.lastSeen[sid] ?? 0) >= this.idleTtlMs) this.delete(sid);
+      if (now - (this.lastSeen[sid] ?? 0) >= this.idleTtlMs) this.evict(sid);
     }
   }
 
@@ -61,7 +67,7 @@ export class SessionRegistry {
     if (!(sessionId in this.transports)) return true;
     const seen = this.lastSeen[sessionId];
     if (seen === undefined || Date.now() - seen >= this.idleTtlMs) {
-      this.delete(sessionId);
+      this.evict(sessionId);
       return true;
     }
     return false;
