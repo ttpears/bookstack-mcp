@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosAdapter } from 'axios';
 import https from 'https';
 import { Semaphore } from './util/semaphore.js';
+import { countWords } from './util/word-count.js';
 
 const MAX_RETRIES_429 = 5;
 
@@ -402,7 +403,7 @@ export class BookStackClient {
     return {
       ...pageMeta,
       url,
-      word_count: page.text ? page.text.split(' ').length : 0,
+      word_count: countWords(page),
       content_format: format,
       content_total_chars: totalChars,
       content_offset: offset,

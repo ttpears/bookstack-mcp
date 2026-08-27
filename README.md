@@ -271,6 +271,12 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 4. In the **API Tokens** section, create a new token
 5. Copy the Token ID and Token Secret
 
+> **Also grant the role “Export Content”** if you read pages written in the
+> WYSIWYG editor. BookStack returns an empty `markdown` body for those pages, and
+> `get_page` recovers it from the server-side HTML→markdown export endpoint. Without
+> the permission that fallback fails and the page reads as empty. The default Viewer
+> role does not include it.
+
 ## Security
 
 - Write operations are **disabled by default**
