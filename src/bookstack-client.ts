@@ -1,7 +1,10 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosAdapter } from 'axios';
 import https from 'https';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { Semaphore } from './util/semaphore.js';
 import { countWords } from './util/word-count.js';
+import { resolveImageUpload } from './util/image-upload.js';
 
 const MAX_RETRIES_429 = 5;
 
@@ -32,6 +35,26 @@ function validateUserIdFilters(query: string): void {
       );
     }
   }
+}
+
+/**
+ * Re-throw an axios failure with BookStack's response body attached. Uploads fail
+ * validation far more often than JSON calls (format, size, permissions, a page the
+ * token cannot edit), and a bare "Request failed with status code 422" hides the
+ * one thing that says which rule tripped.
+ */
+function rethrowWithApiDetail(error: unknown, context: string): never {
+  const axiosError = error as AxiosError;
+  const status = axiosError?.response?.status;
+  if (!status) throw error;
+
+  const body = axiosError.response?.data as any;
+  const detail =
+    body?.error?.message ??
+    (body?.error?.validation && JSON.stringify(body.error.validation)) ??
+    (typeof body === 'string' ? body : body && JSON.stringify(body));
+
+  throw new Error(`${context} failed (HTTP ${status})${detail ? `: ${detail}` : ''}`);
 }
 
 export interface BookStackConfig {
@@ -118,6 +141,28 @@ export interface Attachment {
   links?: {
     html: string;
     markdown: string;
+  };
+}
+
+export interface Image {
+  id: number;
+  name: string;
+  url: string;
+  path: string;
+  type: string;
+  uploaded_to: number;
+  created_at: string;
+  updated_at: string;
+  created_by: number | { id: number; name: string };
+  updated_by: number | { id: number; name: string };
+  /** Ready-to-embed snippets BookStack renders for this image. */
+  content?: {
+    html: string;
+    markdown: string;
+  };
+  thumbs?: {
+    gallery?: string;
+    display?: string;
   };
 }
 
@@ -1049,6 +1094,100 @@ export class BookStackClient {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
     }
     const response = await this.client.delete(`/attachments/${id}`);
+    return response.data;
+  }
+
+  // Image gallery — the images embedded in page content, as opposed to
+  // attachments (files hanging off a page). Uploading here is what makes an
+  // image referencable from page HTML/markdown.
+  async getImages(options?: {
+    uploadedTo?: number;
+    offset?: number;
+    count?: number;
+    sort?: string;
+  }): Promise<ListResponse<Image>> {
+    const params: any = {
+      offset: options?.offset || 0,
+      count: Math.min(options?.count || 50, 500)
+    };
+    if (options?.uploadedTo) params['filter[uploaded_to]'] = options.uploadedTo;
+    if (options?.sort) params.sort = options.sort;
+
+    const response = await this.client.get('/image-gallery', { params });
+    return response.data;
+  }
+
+  async getImage(id: number): Promise<Image> {
+    const response = await this.client.get(`/image-gallery/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Upload a local image file into the gallery and associate it with a page.
+   *
+   * The multipart body goes through the shared axios instance on purpose, so the
+   * upload inherits the concurrency semaphore, the 429 retry/backoff, the request
+   * timeout and the TLS opt-out. That requires overriding `Content-Type` to
+   * undefined for this request: the instance default is `application/json`, and
+   * with it in place axios never reaches its form-data serializer — it JSON-encodes
+   * the FormData instead, silently flattening the file to `"image":{}` and failing
+   * validation server-side. Setting the header to undefined lets axios pick the
+   * multipart serializer and generate the boundary.
+   */
+  async createImage(data: {
+    filePath: string;
+    uploadedTo: number;
+    name?: string;
+    type?: 'gallery' | 'drawio';
+  }): Promise<Image> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    if (!isAbsolute(data.filePath)) {
+      throw new Error(
+        `file_path must be an absolute path, got '${data.filePath}'. The MCP server resolves it ` +
+        `from its own working directory, not the caller's, and does not expand '~'.`
+      );
+    }
+
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(data.filePath);
+    } catch (err) {
+      throw new Error(`Cannot read image at ${data.filePath}: ${(err as Error).message}`);
+    }
+
+    const resolved = resolveImageUpload({
+      filePath: data.filePath,
+      byteLength: bytes.byteLength,
+      name: data.name
+    });
+
+    const form = new FormData();
+    form.append('type', data.type ?? 'gallery');
+    form.append('uploaded_to', String(data.uploadedTo));
+    form.append('name', resolved.name);
+    form.append(
+      'image',
+      new Blob([new Uint8Array(bytes)], { type: resolved.mimeType }),
+      resolved.filename
+    );
+
+    try {
+      const response = await this.client.post('/image-gallery', form, {
+        headers: { 'Content-Type': undefined }
+      });
+      return response.data;
+    } catch (err) {
+      rethrowWithApiDetail(err, `Image upload to page ${data.uploadedTo}`);
+    }
+  }
+
+  async deleteImage(id: number): Promise<any> {
+    if (!this.enableWrite) {
+      throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    }
+    const response = await this.client.delete(`/image-gallery/${id}`);
     return response.data;
   }
 

@@ -241,6 +241,7 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `get_chapters` / `get_chapter` | List or get chapter details |
 | `get_shelves` / `get_shelf` | List or get shelf details |
 | `get_attachments` / `get_attachment` | List or get attachment details |
+| `get_images` / `get_image` | List or get gallery images, with ready-to-embed html/markdown snippets |
 | `get_comments` / `get_comment` | List or get page comments (BookStack v25.11+) |
 | `find_users` | Look up BookStack users by name, email, or slug to resolve user slugs for `{created_by:X}`-style search filters |
 | `get_recycle_bin` | List items in the recycle bin |
@@ -260,8 +261,41 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `delete_page` | Delete a page (recoverable from recycle bin) |
 | `create_shelf` / `update_shelf` / `delete_shelf` | Manage shelves |
 | `create_attachment` / `update_attachment` / `delete_attachment` | Manage attachments |
+| `create_image` / `delete_image` | Upload an image into the gallery so it can be embedded in a page, or delete one ([details](#embedding-images-in-pages)) |
 | `create_comment` / `update_comment` / `delete_comment` | Manage page comments (v25.11+) |
 | `restore_deleted` / `permanently_delete` | Restore or permanently destroy items in the recycle bin |
+
+### Embedding images in pages
+
+Attachments hang files off a page; **gallery images** are what page content can
+actually reference. `create_image` uploads a local file into the gallery and
+returns the hosted URL along with `content.markdown` and `content.html` snippets,
+which you then paste into `create_page` / `update_page`:
+
+```
+create_image(file_path="/tmp/rack-diagram.png", uploaded_to=42)
+  -> { "id": 91, "url": "https://wiki.example/uploads/images/gallery/...png",
+       "content": { "markdown": "![rack-diagram.png](...)", "html": "<a href=...><img src=...></a>" } }
+
+update_page(id=42, markdown="## Rack layout\n\n![rack-diagram.png](...)")
+```
+
+The model passes a **path**, not the bytes: the image never enters the
+conversation, so a 2 MB screenshot costs a few dozen tokens instead of ~2.7 MB of
+base64. This is the reason to prefer it over inlining a `data:` URI.
+
+Notes:
+
+- BookStack accepts `jpg`, `jpeg`, `png`, `gif`, `webp`, `avif`. **SVG is
+  rejected** for gallery images — convert to PNG first.
+- `uploaded_to` is required by BookStack; every gallery image belongs to a page.
+- The token's user needs the **“Manage image library”** role permission
+  (`image-create-all`) *and* edit rights on the target page, or the upload comes
+  back 403.
+- `create_image` is **stdio-only**. It reads a file from the machine running the
+  server, which only means anything when that machine is the caller's own. Over
+  HTTP the server is remote and shared, so the tool is not registered at all —
+  exposing it there would be an arbitrary-file-read primitive against the host.
 
 ## BookStack API Setup
 

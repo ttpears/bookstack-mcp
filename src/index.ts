@@ -60,14 +60,31 @@ function getRequiredEnvVar(name: string): string {
   return value;
 }
 
-function buildServer(config: BookStackConfig): McpServer {
+/**
+ * Server-side capabilities that depend on the transport, not on the BookStack
+ * credential. Kept separate from BookStackConfig because the HTTP path reuses the
+ * very same config objects for every session — a flag stored there would leak into
+ * remote sessions. Omission means "off", so HTTP is safe by default.
+ */
+interface ServerCapabilities {
+  /**
+   * Whether tools may read files from the machine running this server. Only true
+   * on stdio, where the server is a child process of the caller and its filesystem
+   * IS the caller's. Over HTTP the server is remote and shared: a caller-supplied
+   * path would be an arbitrary-file-read primitive against the host (and would not
+   * refer to anything the caller can see anyway).
+   */
+  localFileUploads?: boolean;
+}
+
+function buildServer(config: BookStackConfig, capabilities: ServerCapabilities = {}): McpServer {
   const client = new BookStackClient(config);
   const server = new McpServer({
     name: "bookstack-mcp",
     version: PKG_VERSION
   });
 
-  registerTools(server, client, config);
+  registerTools(server, client, config, capabilities);
   registerResources(server, client);
   registerPrompts(server);
   return server;
@@ -175,7 +192,12 @@ function registerResources(server: McpServer, client: BookStackClient): void {
   );
 }
 
-function registerTools(server: McpServer, client: BookStackClient, config: BookStackConfig): void {
+function registerTools(
+  server: McpServer,
+  client: BookStackClient,
+  config: BookStackConfig,
+  capabilities: ServerCapabilities = {}
+): void {
   // Helpers wrap registerTool and inject MCP tool annotations so clients can
   // distinguish read-only from destructive operations. Typed loosely to defer
   // to the SDK's generic overloads at the call sites.
@@ -505,6 +527,46 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       });
       return {
         content: [{ type: "text", text: JSON.stringify(attachments) }]
+      };
+    }
+  );
+
+  readTool(
+    "get_images",
+    {
+      description: "List gallery images (the images embedded in page content, not attachments). Filter by uploaded_to to get one page's images.",
+      inputSchema: {
+        uploaded_to: z.coerce.number().optional().describe("Only images attached to this page ID"),
+        offset: z.coerce.number().optional().default(0),
+        count: z.coerce.number().max(500).optional().default(50),
+        sort: z.string().optional()
+      }
+    },
+    async (args) => {
+      const images = await client.getImages({
+        uploadedTo: args.uploaded_to,
+        offset: args.offset,
+        count: args.count,
+        sort: args.sort
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(images) }]
+      };
+    }
+  );
+
+  readTool(
+    "get_image",
+    {
+      description: "Get a gallery image, including its url and ready-to-embed html/markdown snippets.",
+      inputSchema: {
+        id: z.coerce.number().min(1)
+      }
+    },
+    async (args) => {
+      const image = await client.getImage(args.id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(image) }]
       };
     }
   );
@@ -912,6 +974,54 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       }
     );
 
+    // Uploading reads a file from this machine, so it only exists on stdio.
+    // See ServerCapabilities.localFileUploads.
+    if (capabilities.localFileUploads) {
+      writeTool(
+        "create_image",
+        {
+          description:
+            "Upload a local image file into BookStack's image gallery so it can be embedded in page content. " +
+            "Pass the path — the image bytes never pass through the conversation. Returns the hosted url plus " +
+            "content.markdown and content.html snippets to paste into create_page/update_page. " +
+            "Accepts jpg, jpeg, png, gif, webp, avif (not svg).",
+          inputSchema: {
+            file_path: z.string().describe("Absolute path to the image on the machine running this server ('~' is not expanded)"),
+            uploaded_to: z.coerce.number().min(1).describe("Page ID to associate the image with; BookStack requires one"),
+            name: z.string().optional().describe("Gallery display name (defaults to the filename)"),
+            type: z.enum(["gallery", "drawio"]).optional().describe("'gallery' for normal images (default), 'drawio' for a diagrams.net PNG")
+          }
+        },
+        async (args) => {
+          const image = await client.createImage({
+            filePath: args.file_path,
+            uploadedTo: args.uploaded_to,
+            name: args.name,
+            type: args.type
+          });
+          return {
+            content: [{ type: "text", text: JSON.stringify(image) }]
+          };
+        }
+      );
+    }
+
+    writeTool(
+      "delete_image",
+      {
+        description: "Delete a gallery image. Pages still referencing it will show a broken image.",
+        inputSchema: {
+          id: z.coerce.number().min(1)
+        }
+      },
+      async (args) => {
+        const result = await client.deleteImage(args.id);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }]
+        };
+      }
+    );
+
     writeTool(
       "delete_book",
       {
@@ -1057,7 +1167,9 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
 }
 
 async function startStdio(config: AppConfig): Promise<void> {
-  const server = buildServer(config.read);
+  // On stdio the server runs as a child of the caller, under the caller's own
+  // account — reading a file it names crosses no trust boundary.
+  const server = buildServer(config.read, { localFileUploads: true });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("BookStack MCP server running on stdio");
