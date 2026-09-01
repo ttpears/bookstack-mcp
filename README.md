@@ -288,6 +288,10 @@ Notes:
 
 - BookStack accepts `jpg`, `jpeg`, `png`, `gif`, `webp`, `avif`. **SVG is
   rejected** for gallery images — convert to PNG first.
+- `content.markdown` / `content.html` reference the **display-scaled** variant
+  (`.../gallery/<month>/scaled-1680-/<file>`), while `url` is the original
+  upload. Embed the snippet as given unless you specifically want full
+  resolution, in which case use `url`.
 - `uploaded_to` is required by BookStack; every gallery image belongs to a page.
 - The token's user needs the **“Manage image library”** role permission
   (`image-create-all`) *and* edit rights on the target page, or the upload comes
