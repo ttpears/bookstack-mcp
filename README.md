@@ -15,6 +15,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that gi
 npx bookstack-mcp
 ```
 
+Field notes: [Why my BookStack MCP server starts read-only](https://hackyourworld.com/bookstack-mcp-server-read-only-by-default/) covers the shared-token rate-limit failure, process-wide cache, response-size measurements, and permission boundaries that shaped the current design.
+
 ## Features
 
 - 20 read-only tools + 20 write tools for complete BookStack API coverage
