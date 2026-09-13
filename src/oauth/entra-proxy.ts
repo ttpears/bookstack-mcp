@@ -449,7 +449,21 @@ export async function handleOAuthRoutes(
           scope: cfg.scopes,
         }),
       });
-      const refreshJson = await refreshRes.json().catch(() => null);
+      const refreshJson = await refreshRes.json().catch(() => null) as
+        | { error?: string; error_description?: string }
+        | null;
+      if (refreshRes.ok) {
+        // Never log the body here: on success it carries the access and refresh tokens.
+        console.error("[oauth] /token refresh_token: OK");
+      } else {
+        // A failed refresh is what a user experiences as the connector going away, so it
+        // has to be visible. Only Entra's error code and description are logged; a failure
+        // response carries no token material.
+        console.error(
+          `[oauth] /token refresh_token: FAILED status=${refreshRes.status} ` +
+          `error=${refreshJson?.error ?? "unknown"} desc=${(refreshJson?.error_description ?? "").slice(0, 300)}`
+        );
+      }
       sendJson(res, refreshRes.ok ? 200 : 400, refreshJson ?? { error: "invalid_grant" });
       return true;
     }

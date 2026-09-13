@@ -1116,6 +1116,10 @@ async function startHttp(config: AppConfig): Promise<void> {
     res.end(JSON.stringify(body));
   };
 
+  // A session id is bearer-equivalent: anyone holding it can drive the session. Log only
+  // a prefix — enough to correlate a session's life across lines, not enough to replay.
+  const shortSid = (sid: string): string => `${sid.slice(0, 8)}...`;
+
   const httpServer = createHttpServer(async (req, res) => {
     try {
       const hostError = validateHost(req);
@@ -1165,7 +1169,23 @@ async function startHttp(config: AppConfig): Promise<void> {
             return;
           }
           transport = sessions.get(sessionId);
-        } else if (!sessionId && req.method === "POST" && isInitializeRequest(parsedBody)) {
+        } else if (sessionId) {
+          // The session was terminated (idle sweep, or a restart — sessions are held in
+          // process memory only). MCP's Streamable HTTP spec, Session Management §3:
+          // the server "MUST respond to requests containing that session ID with HTTP
+          // 404 Not Found", and §4 makes 404 the one signal that tells a client to
+          // re-initialize. Answering 400 here leaves the client no defined recovery, so
+          // the connector stays down until a human reconnects it.
+          console.error(
+            `[mcp] ${req.method} session ${shortSid(sessionId)} not found -> 404 (client should re-initialize); live=${sessions.size()}`
+          );
+          sendJson(res, 404, {
+            jsonrpc: "2.0",
+            error: { code: -32001, message: "Session not found" },
+            id: null
+          });
+          return;
+        } else if (req.method === "POST" && isInitializeRequest(parsedBody)) {
           if (sessions.atCapacity()) {
             sendJson(res, 503, {
               jsonrpc: "2.0",
@@ -1184,11 +1204,15 @@ async function startHttp(config: AppConfig): Promise<void> {
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sid) => {
               sessions.register(sid, transport!, config.oauth && auth ? auth : undefined);
+              console.error(`[mcp] session ${shortSid(sid)} initialized; live=${sessions.size()}`);
             }
           });
           transport.onclose = () => {
             const sid = transport!.sessionId;
-            if (sid) sessions.delete(sid);
+            if (sid) {
+              sessions.delete(sid);
+              console.error(`[mcp] session ${shortSid(sid)} closed; live=${sessions.size()}`);
+            }
           };
           const server = buildServer(sessionConfig);
           await server.connect(transport);
