@@ -55,7 +55,19 @@ BOOKSTACK_TOKEN_ID=your-token-id                # Required
 BOOKSTACK_TOKEN_SECRET=your-token-secret        # Required
 BOOKSTACK_ENABLE_WRITE=false                    # Optional, default false
 BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=false        # Optional, default false
+BOOKSTACK_TIMEOUT_MS=30000                     # Optional, timeout per HTTP attempt
+BOOKSTACK_RETRY_TIMEOUT_MS=60000               # Optional, total budget per API request
 ```
+
+Each API request has a total budget covering concurrency queue time, HTTP attempts,
+and rate-limit backoff. HTTP 429 responses are retried up to five times, with each
+delay capped at 30 seconds. If a delay cannot fit in the remaining budget or retries
+are exhausted, the tool returns an explicit BookStack rate-limit error. The budget
+applies to each API request; tools that fetch multiple endpoints can take longer.
+
+With write operations enabled, `update_page` and `update_chapter` accept `priority`
+as a non-negative integer (including numeric strings). Lower values sort first;
+use these tools to order pages and chapters within a book.
 
 > **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
 

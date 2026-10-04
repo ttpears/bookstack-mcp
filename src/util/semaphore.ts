@@ -14,12 +14,25 @@ export class Semaphore {
     this.permits = max;
   }
 
-  acquire(): Promise<void> {
+  acquire(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(signal.reason);
     if (this.permits > 0) {
       this.permits--;
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => this.waiters.push(resolve));
+    return new Promise<void>((resolve, reject) => {
+      const grant = () => {
+        signal?.removeEventListener('abort', cancel);
+        resolve();
+      };
+      const cancel = () => {
+        const index = this.waiters.indexOf(grant);
+        if (index !== -1) this.waiters.splice(index, 1);
+        reject(signal.reason);
+      };
+      this.waiters.push(grant);
+      signal?.addEventListener('abort', cancel, { once: true });
+    });
   }
 
   release(): void {
@@ -31,9 +44,10 @@ export class Semaphore {
     }
   }
 
-  async run<T>(fn: () => Promise<T>): Promise<T> {
-    await this.acquire();
+  async run<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    await this.acquire(signal);
     try {
+      if (signal?.aborted) throw signal.reason;
       return await fn();
     } finally {
       this.release();
