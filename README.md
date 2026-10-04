@@ -19,7 +19,7 @@ Field notes: [Why my BookStack MCP server starts read-only](https://hackyourworl
 
 ## Features
 
-- 20 read-only tools + 20 write tools for complete BookStack API coverage
+- 21 read-only tools + 22 write tools for BookStack API access
 - Books, chapters, pages, shelves, attachments, and comments — full CRUD
 - Recycle bin support — restore or permanently delete soft-deleted content
 - Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
@@ -142,6 +142,48 @@ mcpServers:
     url: http://bookstack-mcp:8080/mcp
 ```
 
+#### Per-user BookStack credentials
+
+Set `BOOKSTACK_ALLOW_REQUEST_CREDENTIALS=true` on the HTTP server to accept
+`X-Bookstack-Token-Id` and `X-Bookstack-Token-Secret` on each request. Both headers
+must be supplied together; when both are absent, the server uses its environment
+credentials. This is opt-in and does not change the write-tool or OAuth role gates.
+Use a read-only environment token with limited visibility for the fallback.
+Credential overrides apply to each request, including reused MCP sessions, and
+their slug caches are private to that request. Send credentials over HTTPS or a
+trusted internal connection and configure proxies to redact these headers.
+
+```yaml
+mcpServers:
+  bookstack:
+    type: streamable-http
+    url: http://bookstack-mcp:8080/mcp
+    headers:
+      X-Bookstack-Token-Id: "{{BOOKSTACK_TOKEN_ID}}"
+      X-Bookstack-Token-Secret: "{{BOOKSTACK_TOKEN_SECRET}}"
+    customUserVars:
+      BOOKSTACK_TOKEN_ID: { title: "BookStack token ID" }
+      BOOKSTACK_TOKEN_SECRET: { title: "BookStack token secret" }
+```
+
+#### Gallery images
+
+`list_images` lists images with optional `uploaded_to`, `offset`, `count`, and
+`sort` parameters. With write mode enabled, `create_image` accepts exactly one
+absolute `file_path` or HTTP(S) `url`, a required existing page ID `uploaded_to`,
+and an optional `name`. It uploads the binary data directly and returns BookStack's
+hosted URL, thumbnails, and `content.html` / `content.markdown` snippets. PNG,
+JPEG, GIF, WebP, and SVG sources up to 50 MB are supported; BookStack may impose
+smaller limits. `delete_image` deletes an image and its thumbnails by `id`.
+
+In stdio mode, files and HTTP(S) URLs are available to the trusted local client.
+In HTTP mode, local files are disabled unless
+`BOOKSTACK_ALLOW_LOCAL_IMAGE_FILES=true`. URL sources require a comma-separated
+`BOOKSTACK_IMAGE_ALLOWED_HOSTS` hostname allowlist, which also applies to every
+redirect. For example, allow your image service with
+`BOOKSTACK_IMAGE_ALLOWED_HOSTS=images.example.com`. Source downloads never use
+the BookStack authorization token. Deleting an image can break existing page references.
+
 > **3.0.0 breaking change:** the deprecated HTTP+SSE transport (`GET /sse` + `POST /messages`) has been removed. Streamable HTTP at `/mcp` already speaks SSE for streaming responses, and is the only HTTP transport in current MCP clients. If you're on an older client that needs the legacy endpoints, pin to `bookstack-mcp@2.x`.
 
 #### HTTP transport environment variables
@@ -255,6 +297,7 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `get_chapters` / `get_chapter` | List or get chapter details |
 | `get_shelves` / `get_shelf` | List or get shelf details |
 | `get_attachments` / `get_attachment` | List or get attachment details |
+| `list_images` | List gallery images, optionally filtered by page |
 | `get_comments` / `get_comment` | List or get page comments (BookStack v25.11+) |
 | `find_users` | Look up BookStack users by name, email, or slug to resolve user slugs for `{created_by:X}`-style search filters |
 | `get_recycle_bin` | List items in the recycle bin |
@@ -274,6 +317,7 @@ Both templates support `id` autocompletion: as you type, the server searches Boo
 | `delete_page` | Delete a page (recoverable from recycle bin) |
 | `create_shelf` / `update_shelf` / `delete_shelf` | Manage shelves |
 | `create_attachment` / `update_attachment` / `delete_attachment` | Manage attachments |
+| `create_image` / `delete_image` | Upload gallery images from files or URLs, or delete images |
 | `create_comment` / `update_comment` / `delete_comment` | Manage page comments (v25.11+) |
 | `restore_deleted` / `permanently_delete` | Restore or permanently destroy items in the recycle bin |
 

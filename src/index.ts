@@ -21,6 +21,7 @@ import {
   OAuthConfig
 } from "./oauth/entra-proxy.js";
 import { SessionRegistry } from "./session-registry.js";
+import { parseRequestCredentials, requestScopedClient, withRequestCredentials } from "./request-credentials.js";
 
 // App-level config: the read-only credential is always present; the write credential and
 // OAuth proxy are optional. In OAuth mode the per-session credential is chosen by role.
@@ -61,7 +62,7 @@ function getRequiredEnvVar(name: string): string {
 }
 
 function buildServer(config: BookStackConfig): McpServer {
-  const client = new BookStackClient(config);
+  const client = requestScopedClient(config);
   const server = new McpServer({
     name: "bookstack-mcp",
     version: PKG_VERSION
@@ -617,8 +618,44 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     }
   );
 
+  readTool(
+    "list_images",
+    {
+      description: "List gallery images, optionally filtered by their page ID.",
+      inputSchema: {
+        uploaded_to: z.coerce.number().int().min(1).optional(),
+        offset: z.coerce.number().int().min(0).optional(),
+        count: z.coerce.number().int().min(1).max(500).optional(),
+        sort: z.string().optional()
+      }
+    },
+    async args => ({ content: [{ type: "text", text: JSON.stringify(await client.listImages(args)) }] })
+  );
+
   // Register write tools if enabled
   if (config.enableWrite) {
+    writeTool(
+      "create_image",
+      {
+        description: "Upload a gallery image from exactly one absolute file_path or HTTP(S) url. Server source policy applies. Returns hosted URL, thumbnails and HTML/Markdown content.",
+        inputSchema: {
+          file_path: z.string().min(1).optional(),
+          url: z.string().url().optional(),
+          name: z.string().min(1).max(180).optional(),
+          uploaded_to: z.coerce.number().int().min(1).describe("Existing page ID")
+        }
+      },
+      async args => ({ content: [{ type: "text", text: JSON.stringify(await client.createImage(args as any)) }] })
+    );
+    writeTool(
+      "delete_image",
+      {
+        description: "Delete a gallery image and its thumbnails. Existing page references may break.",
+        inputSchema: { id: z.coerce.number().int().min(1) }
+      },
+      async args => ({ content: [{ type: "text", text: JSON.stringify(await client.deleteImage(args.id)) }] })
+    );
+
     writeTool(
       "create_book",
       {
@@ -1066,6 +1103,7 @@ async function startStdio(config: AppConfig): Promise<void> {
 }
 
 async function startHttp(config: AppConfig): Promise<void> {
+  const requestCredentialsEnabled = process.env.BOOKSTACK_ALLOW_REQUEST_CREDENTIALS?.toLowerCase() === "true";
   const port = parseInt(process.env.MCP_HTTP_PORT ?? "8080", 10);
   const host = process.env.MCP_HTTP_HOST ?? "127.0.0.1";
   const mcpPath = process.env.MCP_HTTP_PATH ?? "/mcp";
@@ -1151,6 +1189,13 @@ async function startHttp(config: AppConfig): Promise<void> {
           auth = { sub: result.sub, isWriter: !!result.isWriter };
         }
 
+        let requestCredentials: ReturnType<typeof parseRequestCredentials>;
+        try {
+          requestCredentials = parseRequestCredentials(req.headers, requestCredentialsEnabled);
+        } catch (error) {
+          sendJson(res, 400, { jsonrpc: "2.0", error: { code: -32602, message: (error as Error).message }, id: null });
+          return;
+        }
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
         let transport: StreamableHTTPServerTransport | undefined;
         let parsedBody: unknown;
@@ -1227,7 +1272,7 @@ async function startHttp(config: AppConfig): Promise<void> {
           return;
         }
 
-        await transport.handleRequest(req, res, parsedBody);
+        await withRequestCredentials(requestCredentials, () => transport.handleRequest(req, res, parsedBody));
         return;
       }
 
@@ -1284,6 +1329,8 @@ async function startHttp(config: AppConfig): Promise<void> {
 
 async function main() {
   const baseUrl = getRequiredEnvVar('BOOKSTACK_BASE_URL');
+  const transportMode = (process.env.MCP_TRANSPORT ?? 'stdio').toLowerCase();
+  const isHttpTransport = transportMode === 'http' || transportMode === 'sse';
   const insecureSkipTlsVerify = process.env.BOOKSTACK_INSECURE_SKIP_TLS_VERIFY?.toLowerCase() === 'true';
   const envEnableWrite = process.env.BOOKSTACK_ENABLE_WRITE?.toLowerCase() === 'true';
   const timeoutRaw = process.env.BOOKSTACK_TIMEOUT_MS;
@@ -1318,6 +1365,10 @@ async function main() {
     insecureSkipTlsVerify,
     timeoutMs,
     retryTimeoutMs,
+    allowLocalImageFiles: !isHttpTransport || process.env.BOOKSTACK_ALLOW_LOCAL_IMAGE_FILES?.toLowerCase() === 'true',
+    imageAllowedHosts: isHttpTransport
+      ? (process.env.BOOKSTACK_IMAGE_ALLOWED_HOSTS ?? '').split(',').map(host => host.trim().toLowerCase()).filter(Boolean)
+      : undefined,
     maxConcurrency
   };
 
@@ -1326,7 +1377,7 @@ async function main() {
   const writeTokenId = process.env.BOOKSTACK_WRITE_TOKEN_ID;
   const writeTokenSecret = process.env.BOOKSTACK_WRITE_TOKEN_SECRET;
   const write: BookStackConfig | null = (writeTokenId && writeTokenSecret)
-    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs, retryTimeoutMs, maxConcurrency }
+    ? { ...read, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true }
     : null;
 
   const config: AppConfig = { read, write, oauth };
@@ -1347,8 +1398,7 @@ async function main() {
     console.error('WARNING: TLS certificate verification is DISABLED (BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true). Connections to BookStack are vulnerable to MITM attacks. Use only with trusted self-signed certs on a trusted network.');
   }
 
-  const transportMode = (process.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
-  if (transportMode === "http" || transportMode === "sse") {
+  if (isHttpTransport) {
     await startHttp(config);
   } else {
     await startStdio(config);
