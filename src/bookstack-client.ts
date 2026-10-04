@@ -1,18 +1,9 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosAdapter } from 'axios';
+import axios, { AxiosInstance, AxiosAdapter } from 'axios';
 import https from 'https';
 import { Semaphore } from './util/semaphore.js';
 import { countWords } from './util/word-count.js';
 
-const MAX_RETRIES_429 = 5;
-
-function parseRetryAfter(value: unknown): number | null {
-  if (typeof value !== 'string' || !value) return null;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
-  const dateMs = Date.parse(value);
-  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
-  return null;
-}
+import { rateLimitedAdapter } from './util/rate-limit.js';
 
 // BookStack resolves {created_by:X}/{updated_by:X}/{owned_by:X} by user SLUG, with 'me'
 // as a shortcut for the token's own user, and silently SKIPS the filter when X matches no
@@ -43,6 +34,8 @@ export interface BookStackConfig {
   /** Per-request HTTP timeout in ms. Bounds a slow/hung BookStack response so a
    *  call fails cleanly instead of hanging until the MCP client gives up. */
   timeoutMs?: number;
+  /** Total budget per API request, including queueing and 429 retries. Default 60s. */
+  retryTimeoutMs?: number;
   /** Max concurrent in-flight HTTP requests to BookStack, process-wide per base
    *  URL. Bounds concurrent requests to smooth out parallel bursts (the pattern
    *  that triggers 429 storms). This complements, does not replace, the 429
@@ -229,24 +222,7 @@ export class BookStackClient {
       httpsAgent: config.insecureSkipTlsVerify
         ? new https.Agent({ rejectUnauthorized: false })
         : undefined,
-      // Every request — including the 429-retry re-issue below — flows through
-      // this adapter exactly once per HTTP attempt. The retry's backoff sleep
-      // happens in the response interceptor (outside the adapter), so the
-      // permit is released between attempts, not held during the wait.
-      adapter: (requestConfig) => limiter.run(() => baseAdapter(requestConfig)),
-    });
-
-    this.client.interceptors.response.use(undefined, async (error: AxiosError) => {
-      const cfg = error.config as (InternalAxiosRequestConfig & { __retry429?: number }) | undefined;
-      if (!cfg || error.response?.status !== 429) throw error;
-      cfg.__retry429 = (cfg.__retry429 ?? 0) + 1;
-      if (cfg.__retry429 > MAX_RETRIES_429) throw error;
-      const retryAfter = parseRetryAfter(error.response.headers?.['retry-after']);
-      const backoff = Math.min(30000, 1000 * 2 ** (cfg.__retry429 - 1));
-      const delay = retryAfter ?? backoff;
-      console.error(`BookStack rate limited (429); retry ${cfg.__retry429}/${MAX_RETRIES_429} in ${delay}ms`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return this.client.request(cfg);
+      adapter: rateLimitedAdapter(baseAdapter, limiter, config.retryTimeoutMs ?? 60000),
     });
   }
 
@@ -737,6 +713,7 @@ export class BookStackClient {
     markdown?: string;
     book_id?: number;
     chapter_id?: number;
+    priority?: number;
   }): Promise<any> {
     if (!this.enableWrite) {
       throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');

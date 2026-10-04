@@ -756,14 +756,15 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
     writeTool(
       "update_page",
       {
-        description: "Update an existing page. Pass book_id (and optionally chapter_id) to move the page to a different location.",
+        description: "Update an existing page. Pass book_id (and optionally chapter_id) to move the page to a different location, or priority to reorder it.",
         inputSchema: {
           id: z.coerce.number().min(1),
           name: z.string().optional().describe("Optional: New page name"),
           html: z.string().optional().describe("Optional: New HTML content"),
           markdown: z.string().optional().describe("Optional: New Markdown content"),
           book_id: z.coerce.number().min(1).optional().describe("Optional: Move page to this book"),
-          chapter_id: z.coerce.number().optional().describe("Optional: Move page into this chapter (must belong to the target book; pass 0 to move out of any chapter)")
+          chapter_id: z.coerce.number().optional().describe("Optional: Move page into this chapter (must belong to the target book; pass 0 to move out of any chapter)"),
+          priority: z.coerce.number().int().min(0).optional().describe("Optional: Sort order (non-negative integer, lower sorts first)")
         }
       },
       async (args) => {
@@ -772,7 +773,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           html: args.html,
           markdown: args.markdown,
           book_id: args.book_id,
-          chapter_id: args.chapter_id
+          chapter_id: args.chapter_id,
+          priority: args.priority
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page) }]
@@ -1288,6 +1290,10 @@ async function main() {
   const timeoutParsed = timeoutRaw ? parseInt(timeoutRaw, 10) : NaN;
   const timeoutMs = Number.isFinite(timeoutParsed) && timeoutParsed > 0 ? timeoutParsed : undefined;
 
+  const retryTimeoutParsed = Number(process.env.BOOKSTACK_RETRY_TIMEOUT_MS);
+  const retryTimeoutMs = Number.isFinite(retryTimeoutParsed) && retryTimeoutParsed > 0
+    ? retryTimeoutParsed : undefined;
+
   const concurrencyRaw = process.env.BOOKSTACK_MAX_CONCURRENCY;
   const concurrencyParsed = concurrencyRaw ? parseInt(concurrencyRaw, 10) : NaN;
   const maxConcurrency = Number.isFinite(concurrencyParsed) && concurrencyParsed > 0
@@ -1311,6 +1317,7 @@ async function main() {
     enableWrite: oauth ? false : envEnableWrite,
     insecureSkipTlsVerify,
     timeoutMs,
+    retryTimeoutMs,
     maxConcurrency
   };
 
@@ -1319,7 +1326,7 @@ async function main() {
   const writeTokenId = process.env.BOOKSTACK_WRITE_TOKEN_ID;
   const writeTokenSecret = process.env.BOOKSTACK_WRITE_TOKEN_SECRET;
   const write: BookStackConfig | null = (writeTokenId && writeTokenSecret)
-    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs, maxConcurrency }
+    ? { baseUrl, tokenId: writeTokenId, tokenSecret: writeTokenSecret, enableWrite: true, insecureSkipTlsVerify, timeoutMs, retryTimeoutMs, maxConcurrency }
     : null;
 
   const config: AppConfig = { read, write, oauth };
