@@ -238,7 +238,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         offset: z.coerce.number().default(0),
         count: z.coerce.number().max(500).default(50),
         sort: z.string().optional(),
-        filter: z.record(z.any()).optional()
+        filter: z.record(z.string(), z.any()).optional()
       }
     },
     async (args) => {
@@ -280,7 +280,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         offset: z.coerce.number().default(0),
         count: z.coerce.number().max(500).default(50),
         sort: z.string().optional(),
-        filter: z.record(z.any()).optional()
+        filter: z.record(z.string(), z.any()).optional()
       }
     },
     async (args) => {
@@ -454,7 +454,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         offset: z.coerce.number().default(0),
         count: z.coerce.number().max(500).default(50),
         sort: z.string().optional(),
-        filter: z.record(z.any()).optional()
+        filter: z.record(z.string(), z.any()).optional()
       }
     },
     async (args) => {
@@ -494,7 +494,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
         offset: z.coerce.number().default(0),
         count: z.coerce.number().max(500).default(50),
         sort: z.string().optional(),
-        filter: z.record(z.any()).optional()
+        filter: z.record(z.string(), z.any()).optional()
       }
     },
     async (args) => {

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 test('MCP page ordering reaches BookStack and rate limits reach the caller', async () => {
   const updates: any[] = [];
+  const listings: string[] = [];
   let limitedAttempts = 0;
   const api = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -21,6 +22,7 @@ test('MCP page ordering reaches BookStack and rate limits reach the caller', asy
       updates.push(data);
       res.end(JSON.stringify({ id: 1, book_id: 2, slug: 'page', markdown: '', ...data }));
     } else {
+      listings.push(req.url!);
       res.end(JSON.stringify({ data: [{ id: 2, slug: 'book' }], total: 1 }));
     }
   });
@@ -44,6 +46,18 @@ test('MCP page ordering reaches BookStack and rate limits reach the caller', asy
     const tools = await client.listTools();
     for (const name of ['list_images', 'create_image', 'delete_image']) {
       assert.ok(tools.tools.some(tool => tool.name === name));
+    }
+    for (const entity of ['books', 'shelves', 'attachments', 'pages']) {
+      const firstRequest = listings.length;
+      const listing = await client.callTool({
+        name: `get_${entity}`, arguments: { filter: { name: 'example' } }
+      });
+      assert.notEqual(listing.isError, true, JSON.stringify({entity, listing}));
+      const requestedPath = listings.slice(firstRequest).find(path => path.startsWith(`/api/${entity}?`));
+      assert.ok(requestedPath, `missing ${entity} listing request`);
+      const request = new URL(requestedPath, 'http://bookstack.test');
+      assert.equal(request.pathname, `/api/${entity}`);
+      assert.equal(request.searchParams.get('filter[name]'), 'example');
     }
     const result = await client.callTool({ name: 'update_page', arguments: { id: '1', priority: '0' } });
     assert.notEqual(result.isError, true);
