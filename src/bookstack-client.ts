@@ -2,8 +2,8 @@ import axios, { AxiosInstance, AxiosAdapter } from 'axios';
 import https from 'https';
 import { Semaphore } from './util/semaphore.js';
 import { countWords } from './util/word-count.js';
-
 import { rateLimitedAdapter } from './util/rate-limit.js';
+import { MAX_IMAGE_BYTES, readImageSource } from './image-source.js';
 
 // BookStack resolves {created_by:X}/{updated_by:X}/{owned_by:X} by user SLUG, with 'me'
 // as a shortcut for the token's own user, and silently SKIPS the filter when X matches no
@@ -36,6 +36,10 @@ export interface BookStackConfig {
   timeoutMs?: number;
   /** Total budget per API request, including queueing and 429 retries. Default 60s. */
   retryTimeoutMs?: number;
+  /** Isolate permission-dependent slug lookups for request-supplied identities. */
+  privateSlugCache?: boolean;
+  allowLocalImageFiles?: boolean;
+  imageAllowedHosts?: string[];
   /** Max concurrent in-flight HTTP requests to BookStack, process-wide per base
    *  URL. Bounds concurrent requests to smooth out parallel bursts (the pattern
    *  that triggers 429 storms). This complements, does not replace, the 429
@@ -202,10 +206,16 @@ export class BookStackClient {
   private client: AxiosInstance;
   private enableWrite: boolean;
   private baseUrl: string;
+  private slugCache: SlugCacheEntry;
+  private imageSourcePolicy: Pick<BookStackConfig, 'allowLocalImageFiles' | 'imageAllowedHosts'>;
 
   constructor(config: BookStackConfig) {
     this.enableWrite = config.enableWrite || false;
     this.baseUrl = config.baseUrl;
+    this.imageSourcePolicy = config;
+    this.slugCache = config.privateSlugCache
+      ? { cache: new Map(), inflight: new Map() }
+      : getSlugCacheEntry(config.baseUrl);
     const limiter = getConcurrencyLimiter(
       config.baseUrl,
       config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY
@@ -246,7 +256,7 @@ export class BookStackClient {
    * single in-flight warm. Failure is non-fatal: getBookSlug lazily fills gaps.
    */
   private async warmBookSlugCache(): Promise<void> {
-    const entry = getSlugCacheEntry(this.baseUrl);
+    const entry = this.slugCache;
 
     // A completed warm is still fresh → nothing to do (lazy fetch covers gaps).
     if (entry.warmedAt !== undefined && Date.now() - entry.warmedAt < SLUG_CACHE_TTL_MS) {
@@ -287,7 +297,7 @@ export class BookStackClient {
     // that existed at warm time is a cache hit — shared across all sessions.
     await this.warmBookSlugCache();
 
-    const entry = getSlugCacheEntry(this.baseUrl);
+    const entry = this.slugCache;
     const cached = entry.cache.get(bookId);
     if (cached !== undefined) return cached;
 
@@ -593,7 +603,7 @@ export class BookStackClient {
           pageData.markdown = exportResponse.data;
         }
       } catch (error) {
-        console.error(`Markdown export fallback failed for page ${id}:`, error);
+        console.error(`Markdown export fallback failed for page ${id}:`, error instanceof Error ? error.message : 'Unknown error');
       }
     }
 
@@ -616,6 +626,45 @@ export class BookStackClient {
   async getChapter(id: number): Promise<any> {
     const response = await this.client.get(`/chapters/${id}`);
     return await this.enhanceChapterResponse(response.data);
+  }
+
+  async listImages(options: { uploaded_to?: number; offset?: number; count?: number; sort?: string } = {}): Promise<any> {
+    const params: any = { offset: options.offset ?? 0, count: Math.min(options.count ?? 50, 500) };
+    if (options.sort) params.sort = options.sort;
+    if (options.uploaded_to !== undefined) params['filter[uploaded_to]'] = options.uploaded_to;
+    return (await this.client.get('/image-gallery', { params })).data;
+  }
+
+  async createImage(data: { file_path?: string; url?: string; name?: string; uploaded_to: number }): Promise<any> {
+    if (!this.enableWrite) throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    if (!Number.isInteger(data.uploaded_to) || data.uploaded_to < 1) throw new Error('uploaded_to must be a positive page ID.');
+    const source = await readImageSource({ ...data,
+      allowLocalFiles: this.imageSourcePolicy.allowLocalImageFiles,
+      allowedHosts: this.imageSourcePolicy.imageAllowedHosts
+    });
+    const form = new FormData();
+    form.set('type', 'gallery');
+    form.set('uploaded_to', String(data.uploaded_to));
+    if (data.name !== undefined) form.set('name', data.name);
+    form.set('image', new Blob([new Uint8Array(source.bytes)], { type: source.type }), source.filename);
+    try {
+      // Removing the JSON default lets Axios set the multipart boundary. Using
+      // the existing client preserves token auth, TLS settings and retry limits.
+      return (await this.client.post('/image-gallery', form, {
+        headers: { 'Content-Type': undefined }, maxBodyLength: MAX_IMAGE_BYTES + 1024 * 1024
+      })).data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response && error.response.status !== 429) {
+        throw new Error(`BookStack image upload failed (HTTP ${error.response.status}): ${JSON.stringify(error.response.data)}`, { cause: error });
+      }
+      throw error;
+    }
+  }
+
+  async deleteImage(id: number): Promise<any> {
+    if (!this.enableWrite) throw new Error('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
+    await this.client.delete(`/image-gallery/${id}`);
+    return { deleted: true, id };
   }
 
   async createBook(data: {
@@ -762,7 +811,7 @@ export class BookStackClient {
         return response.data;
       }
     } catch (error) {
-      console.error(`Export error for page ${id}:`, error);
+      console.error(`Export error for page ${id}:`, error instanceof Error ? error.message : 'Unknown error');
       throw new Error(`Failed to export page ${id} as ${format}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

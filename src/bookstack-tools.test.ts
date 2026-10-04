@@ -41,6 +41,10 @@ test('MCP page ordering reaches BookStack and rate limits reach the caller', asy
   });
   try {
     await client.connect(transport);
+    const tools = await client.listTools();
+    for (const name of ['list_images', 'create_image', 'delete_image']) {
+      assert.ok(tools.tools.some(tool => tool.name === name));
+    }
     const result = await client.callTool({ name: 'update_page', arguments: { id: '1', priority: '0' } });
     assert.notEqual(result.isError, true);
     assert.deepEqual(updates, [{ priority: 0 }]);
