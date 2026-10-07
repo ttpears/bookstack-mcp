@@ -773,7 +773,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           book_id: z.coerce.number().min(1).describe("Book ID where the page will be created"),
           chapter_id: z.coerce.number().optional().describe("Optional: Chapter ID if page should be in a chapter"),
           html: z.string().optional().describe("Optional: HTML content"),
-          markdown: z.string().optional().describe("Optional: Markdown content")
+          markdown: z.string().optional().describe("Optional: Markdown content"),
+          changelog: z.string().min(1).max(180).optional().describe("Optional: Revision changelog message shown in the page history (BookStack v26.09+; older servers ignore it)")
         }
       },
       async (args) => {
@@ -782,7 +783,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           book_id: args.book_id,
           chapter_id: args.chapter_id,
           html: args.html,
-          markdown: args.markdown
+          markdown: args.markdown,
+          changelog: args.changelog
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page) }]
@@ -801,7 +803,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           markdown: z.string().optional().describe("Optional: New Markdown content"),
           book_id: z.coerce.number().min(1).optional().describe("Optional: Move page to this book"),
           chapter_id: z.coerce.number().optional().describe("Optional: Move page into this chapter (must belong to the target book; pass 0 to move out of any chapter)"),
-          priority: z.coerce.number().int().min(0).optional().describe("Optional: Sort order (non-negative integer, lower sorts first)")
+          priority: z.coerce.number().int().min(0).optional().describe("Optional: Sort order (non-negative integer, lower sorts first)"),
+          changelog: z.string().min(1).max(180).optional().describe("Optional: Revision changelog message shown in the page history (BookStack v26.09+; older servers ignore it)")
         }
       },
       async (args) => {
@@ -811,7 +814,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           markdown: args.markdown,
           book_id: args.book_id,
           chapter_id: args.chapter_id,
-          priority: args.priority
+          priority: args.priority,
+          changelog: args.changelog
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page) }]
