@@ -7,7 +7,8 @@
     "bookstack-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "PRIVACY.md"
   ],
   "scripts": {
     "build": "tsc && shx chmod +x dist/*.js",

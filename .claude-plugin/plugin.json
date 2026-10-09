@@ -6,6 +6,7 @@
     "name": "Tim Pearson"
   },
   "homepage": "https://github.com/ttpears/bookstack-mcp",
+  "privacyPolicyUrl": "https://github.com/ttpears/bookstack-mcp/blob/8f2b69e1a8ad6fbb946b851565bfd10b7d3d289d/PRIVACY.md",
   "repository": "https://github.com/ttpears/bookstack-mcp",
   "license": "MIT",
   "keywords": [
