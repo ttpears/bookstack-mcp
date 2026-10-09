@@ -9,6 +9,14 @@ MCP client, AI provider, or other service may have additional data practices and
 policies. This document does not establish those services' retention periods or
 make commitments on their behalf.
 
+The error-handling protections described below require security commit
+[`cbd756c41eac58b06588a8b667fd66910caf81b4`](https://github.com/ttpears/bookstack-mcp/commit/cbd756c41eac58b06588a8b667fd66910caf81b4),
+which is under review in [PR #47](https://github.com/ttpears/bookstack-mcp/pull/47).
+This policy accompanies the dependent review in
+[PR #46](https://github.com/ttpears/bookstack-mcp/pull/46). It does not imply that
+an existing package, image or deployment already includes that commit. Check
+the source revision of the version you run.
+
 ## Data processed and where it goes
 
 - **BookStack:** The application sends API requests to `BOOKSTACK_BASE_URL`,
@@ -95,18 +103,32 @@ and deletion requests.
 
 ## Logs and error responses
 
-Diagnostics are written to standard error. They include configuration such as
-the BookStack URL and OAuth tenant, abbreviated HTTP session IDs, session counts,
-export page IDs and lengths, rate-limit retries, and authentication diagnostics.
-OAuth failure paths can log upstream response excerpts, error descriptions and
-client IDs. Some error paths log full error objects; libraries can attach
-request headers, URLs or response data to those objects. Error responses returned
-to an MCP client can also include upstream response details.
+Diagnostics are written to standard error. They include the BookStack and public
+HTTP URL origins (without URL credentials, paths, queries or fragments), OAuth
+tenant, abbreviated HTTP session IDs, session counts, export page IDs and
+lengths, rate-limit retries, and authentication diagnostics.
 
-**Not all diagnostic paths are redacted.** Do not assume that logs or error
-messages are free of credentials or private content. Operators should restrict
-access to logs, configure appropriate collection and retention, and redact
-sensitive material before sharing it.
+With the security commit identified above, upstream BookStack and image-source
+failures are converted to application-authored context, numeric HTTP status and
+allowlisted error codes. These errors omit upstream bodies, headers, arbitrary
+messages and nested causes. MCP tool handlers preserve explicitly marked local
+validation messages; startup and HTTP error logs omit complete exception
+objects. OAuth failure logs and responses use numeric status and allowlisted
+OAuth codes rather than upstream bodies or descriptions; callback diagnostics
+omit callback values and client IDs. Successful OAuth token responses and
+normal tool results still carry their intended data to the requesting client.
+
+**Earlier versions can expose sensitive data in errors.** Builds that do not
+include the identified security commit can log upstream response excerpts,
+descriptions, client IDs or full exception objects, and return upstream error
+details to MCP clients. Library exceptions can contain credentials, request
+headers, URLs or private response data.
+
+These application protections do not guarantee that all logs are free of
+credentials or private content. MCP clients, proxies, hosting platforms and
+other infrastructure can collect their own logs. Operators should restrict log
+access, configure collection and retention, and review and redact sensitive
+material before sharing logs or error reports.
 
 ## Third-party services and project interactions
 
