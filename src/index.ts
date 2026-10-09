@@ -22,6 +22,7 @@ import {
 } from "./oauth/entra-proxy.js";
 import { SessionRegistry } from "./session-registry.js";
 import { parseRequestCredentials, requestScopedClient, withRequestCredentials } from "./request-credentials.js";
+import { PublicError, logSafeError, safeError, safeUrlOrigin } from "./util/safe-errors.js";
 
 // App-level config: the read-only credential is always present; the write credential and
 // OAuth proxy are optional. In OAuth mode the per-session credential is chosen by role.
@@ -105,7 +106,7 @@ function registerResources(server: McpServer, client: BookStackClient): void {
     async (uri: URL, variables) => {
       const id = Number(variables.id);
       if (!Number.isFinite(id) || id < 1) {
-        throw new Error(`Invalid book id: ${variables.id}`);
+        throw new PublicError(`Invalid book id: ${variables.id}`);
       }
       const book = await client.getBook(id);
       return {
@@ -148,7 +149,7 @@ function registerResources(server: McpServer, client: BookStackClient): void {
     async (uri: URL, variables) => {
       const id = Number(variables.id);
       if (!Number.isFinite(id) || id < 1) {
-        throw new Error(`Invalid page id: ${variables.id}`);
+        throw new PublicError(`Invalid page id: ${variables.id}`);
       }
       const page = await client.getPage(id, { format: "markdown" });
       return {
@@ -177,13 +178,20 @@ function registerResources(server: McpServer, client: BookStackClient): void {
 }
 
 function registerTools(server: McpServer, client: BookStackClient, config: BookStackConfig): void {
+  const safeHandler = (handler: (...args: any[]) => any) => async (...args: any[]) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      throw safeError(error);
+    }
+  };
   // Helpers wrap registerTool and inject MCP tool annotations so clients can
   // distinguish read-only from destructive operations. Typed loosely to defer
   // to the SDK's generic overloads at the call sites.
   const readTool: typeof server.registerTool = ((name: string, cfg: any, handler: any) =>
-    server.registerTool(name, { ...cfg, annotations: { ...READ_ONLY_ANNOTATIONS, ...(cfg.annotations ?? {}) } }, handler)) as any;
+    server.registerTool(name, { ...cfg, annotations: { ...READ_ONLY_ANNOTATIONS, ...(cfg.annotations ?? {}) } }, safeHandler(handler))) as any;
   const writeTool: typeof server.registerTool = ((name: string, cfg: any, handler: any) =>
-    server.registerTool(name, { ...cfg, annotations: { ...WRITE_ANNOTATIONS, ...(cfg.annotations ?? {}) } }, handler)) as any;
+    server.registerTool(name, { ...cfg, annotations: { ...WRITE_ANNOTATIONS, ...(cfg.annotations ?? {}) } }, safeHandler(handler))) as any;
 
   // Register read-only tools.
   // Common params (offset/count/sort/filter/id) are self-describing and intentionally
@@ -1290,7 +1298,7 @@ async function startHttp(config: AppConfig): Promise<void> {
 
       sendJson(res, 404, { error: "Not Found" });
     } catch (err) {
-      console.error("HTTP handler error:", err);
+      logSafeError("HTTP handler error", err);
       if (!res.headersSent) {
         sendJson(res, 500, {
           jsonrpc: "2.0",
@@ -1383,10 +1391,10 @@ async function main() {
   const config: AppConfig = { read, write, oauth };
 
   console.error('Initializing BookStack MCP Server...');
-  console.error(`BookStack URL: ${baseUrl}`);
+  console.error(`BookStack origin: ${safeUrlOrigin(baseUrl)}`);
   if (oauth) {
     console.error(`Auth: Entra OAuth proxy ENABLED (tenant ${oauth.tenantId})`);
-    console.error(`  Public URL: ${oauth.serverUrl}`);
+    console.error(`  Public origin: ${safeUrlOrigin(oauth.serverUrl)}`);
     console.error(`  Write role: ${oauth.writeRole}`);
     if (!write) {
       console.error('  WARNING: no BOOKSTACK_WRITE_TOKEN_ID/SECRET set — all sessions are read-only regardless of role.');
@@ -1406,6 +1414,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  logSafeError('Server startup failed', err);
   process.exit(1);
 });
