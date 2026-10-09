@@ -14,6 +14,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { KvStore, InMemoryKvStore, createStore } from "./kv-store.js";
+import { logSafeError, oauthErrorCode } from "../util/safe-errors.js";
 
 export interface OAuthConfig {
   serverUrl: string; // public HTTPS base URL of THIS server, no trailing slash
@@ -235,9 +236,9 @@ export async function handleOAuthRoutes(
 
   if (["/register", "/authorize", "/callback", "/token"].includes(path)) {
     console.error(
-      `[oauth] ${req.method} ${path}` +
+      `[oauth] ${path}` +
         (path === "/callback"
-          ? ` error=${url.searchParams.get("error") ?? ""} code=${url.searchParams.get("code") ? "yes" : "no"} state=${url.searchParams.get("state") ? "yes" : "no"}`
+          ? ` error=${url.searchParams.has("error")} code=${url.searchParams.has("code")} state=${url.searchParams.has("state")}`
           : "")
     );
   }
@@ -357,7 +358,7 @@ export async function handleOAuthRoutes(
     await store.del(`pending:${upstreamState}`);
     if (err || !code) {
       const dest = new URL(p.clientRedirectUri);
-      dest.searchParams.set("error", err || "invalid_request");
+      dest.searchParams.set("error", oauthErrorCode(err, 'invalid_request'));
       if (p.clientState) dest.searchParams.set("state", p.clientState);
       res.writeHead(302, { Location: dest.toString() });
       res.end();
@@ -380,8 +381,10 @@ export async function handleOAuthRoutes(
     const rawTok = await tokenRes.text();
     let tokenJson: any = null;
     try { tokenJson = JSON.parse(rawTok); } catch { /* non-JSON */ }
-    if (!tokenRes.ok || !tokenJson || !tokenJson.access_token) {
-      console.error(`[oauth] /callback Entra token exchange FAILED: status=${tokenRes.status} body=${rawTok.slice(0, 600)}`);
+    if (!tokenRes.ok || typeof tokenJson?.access_token !== 'string' || !tokenJson.access_token) {
+      logSafeError('[oauth] /callback Entra token exchange FAILED', {
+        status: tokenRes.status, code: oauthErrorCode(tokenJson?.error)
+      });
       const dest = new URL(p.clientRedirectUri);
       dest.searchParams.set("error", "server_error");
       if (p.clientState) dest.searchParams.set("state", p.clientState);
@@ -427,7 +430,7 @@ export async function handleOAuthRoutes(
         return true;
       }
       if (form["client_id"] && form["client_id"] !== issued.clientId) {
-        console.error(`[oauth] /token authorization_code: client mismatch (got=${form["client_id"]} want=${issued.clientId})`);
+        console.error('[oauth] /token authorization_code: client mismatch');
         sendJson(res, 400, { error: "invalid_client" });
         return true;
       }
@@ -450,21 +453,20 @@ export async function handleOAuthRoutes(
         }),
       });
       const refreshJson = await refreshRes.json().catch(() => null) as
-        | { error?: string; error_description?: string }
+        | Record<string, unknown>
         | null;
-      if (refreshRes.ok) {
+      const refreshed = refreshRes.ok && typeof refreshJson?.access_token === 'string' && !!refreshJson.access_token;
+      if (refreshed) {
         // Never log the body here: on success it carries the access and refresh tokens.
         console.error("[oauth] /token refresh_token: OK");
       } else {
-        // A failed refresh is what a user experiences as the connector going away, so it
-        // has to be visible. Only Entra's error code and description are logged; a failure
-        // response carries no token material.
-        console.error(
-          `[oauth] /token refresh_token: FAILED status=${refreshRes.status} ` +
-          `error=${refreshJson?.error ?? "unknown"} desc=${(refreshJson?.error_description ?? "").slice(0, 300)}`
-        );
+        logSafeError('[oauth] /token refresh_token: FAILED', {
+          status: refreshRes.status, code: oauthErrorCode(refreshJson?.error, 'invalid_grant')
+        });
       }
-      sendJson(res, refreshRes.ok ? 200 : 400, refreshJson ?? { error: "invalid_grant" });
+      sendJson(res, refreshed ? 200 : 400, refreshed ? refreshJson : {
+        error: oauthErrorCode(refreshJson?.error, 'invalid_grant')
+      });
       return true;
     }
 

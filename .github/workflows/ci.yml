@@ -32,7 +32,8 @@ jobs:
   # GITHUB_TOKEN (no PAT) and amd64 only. Tag: branch-<slug>. Never publishes npm.
   docker-preview:
     needs: build
-    if: github.event_name == 'pull_request'
+    # Drafts are for review only; publish preview images after the PR is ready.
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     permissions:
       contents: read
