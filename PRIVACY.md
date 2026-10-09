@@ -9,13 +9,11 @@ MCP client, AI provider, or other service may have additional data practices and
 policies. This document does not establish those services' retention periods or
 make commitments on their behalf.
 
-The error-handling protections described below require security commit
-[`cbd756c41eac58b06588a8b667fd66910caf81b4`](https://github.com/ttpears/bookstack-mcp/commit/cbd756c41eac58b06588a8b667fd66910caf81b4),
-which is under review in [PR #47](https://github.com/ttpears/bookstack-mcp/pull/47).
-This policy accompanies the dependent review in
-[PR #46](https://github.com/ttpears/bookstack-mcp/pull/46). It does not imply that
-an existing package, image or deployment already includes that commit. Check
-the source revision of the version you run.
+The error-handling protections described below were merged in
+[PR #47](https://github.com/ttpears/bookstack-mcp/pull/47) at security commit
+[`35b218c5e7eca129ab94ad8f8b89275815697e3c`](https://github.com/ttpears/bookstack-mcp/commit/35b218c5e7eca129ab94ad8f8b89275815697e3c).
+This policy does not imply that an existing package, image or deployment already
+includes those changes. Check the source revision of the version you run.
 
 ## Data processed and where it goes
 
