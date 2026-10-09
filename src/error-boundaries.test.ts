@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -9,8 +10,10 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 const source = fileURLToPath(new URL('./index.ts', import.meta.url));
 const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+// Generated only for loopback mocks; no stored or real credentials are used.
+const syntheticCredential = () => `SYNTHETIC_${randomUUID()}`;
 const baseEnv = { ...env, MCP_OAUTH_ENABLE: 'false', BOOKSTACK_TOKEN_ID: 'test',
-  BOOKSTACK_TOKEN_SECRET: 'SYNTHETIC_API_SECRET', BOOKSTACK_ENABLE_WRITE: 'true' };
+  BOOKSTACK_TOKEN_SECRET: syntheticCredential(), BOOKSTACK_ENABLE_WRITE: 'true' };
 async function unusedPort(): Promise<number> {
   const server = createServer();
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -100,7 +103,7 @@ test('startup diagnostics omit secrets and paths in configured URLs', async () =
     env: { ...baseEnv, MCP_TRANSPORT: 'stdio', MCP_OAUTH_ENABLE: 'true',
       BOOKSTACK_BASE_URL: 'https://SYNTHETIC_USER:SYNTHETIC_PASSWORD@wiki.example/SYNTHETIC_PATH?token=SYNTHETIC_QUERY',
       MCP_SERVER_URL: 'https://SYNTHETIC_USER:SYNTHETIC_PASSWORD@mcp.example/SYNTHETIC_PATH?token=SYNTHETIC_QUERY',
-      OAUTH_TENANT_ID: 'tenant', OAUTH_CLIENT_ID: 'application', OAUTH_CLIENT_SECRET: 'SYNTHETIC_OAUTH_SECRET', REDIS_URL: '' } });
+      OAUTH_TENANT_ID: 'tenant', OAUTH_CLIENT_ID: 'application', OAUTH_CLIENT_SECRET: syntheticCredential(), REDIS_URL: '' } });
   let logs = '';
   transport.stderr?.on('data', chunk => { logs += chunk.toString(); });
   try { await client.connect(transport); await client.listTools(); }
