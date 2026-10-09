@@ -74,6 +74,10 @@ With write operations enabled, `update_page` and `update_chapter` accept `priori
 as a non-negative integer (including numeric strings). Lower values sort first;
 use these tools to order pages and chapters within a book.
 
+`create_page` and `update_page` also accept an optional `changelog` message
+(1–180 characters), saved as the revision summary in the page's history. It
+needs BookStack v26.09 or newer; older versions silently ignore it.
+
 > **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
 
 ## Client Configuration

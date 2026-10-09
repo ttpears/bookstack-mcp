@@ -726,6 +726,7 @@ export class BookStackClient {
     markdown?: string;
     book_id: number;
     chapter_id?: number;
+    changelog?: string;
   }): Promise<any> {
     if (!this.enableWrite) {
       throw new PublicError('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
@@ -765,6 +766,7 @@ export class BookStackClient {
     book_id?: number;
     chapter_id?: number;
     priority?: number;
+    changelog?: string;
   }): Promise<any> {
     if (!this.enableWrite) {
       throw new PublicError('Write operations are disabled. Set BOOKSTACK_ENABLE_WRITE=true to enable.');
