@@ -27,12 +27,13 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Build and push a throwaway GHCR image for every PR so the branch can be
-  # deployed somewhere (e.g. an internal LibreChat host) before it ships. Uses the built-in
+  # Build a preview image for non-draft PRs; push to GHCR only for same-repository
+  # PRs so forks can validate the build without package write access. Uses the
   # GITHUB_TOKEN (no PAT) and amd64 only. Tag: branch-<slug>. Never publishes npm.
   docker-preview:
     needs: build
-    if: github.event_name == 'pull_request'
+    # Drafts are for review only; publish preview images after the PR is ready.
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,6 +46,7 @@ jobs:
           echo "tag=branch-${slug}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -53,7 +55,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          push: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ghcr.io/ttpears/bookstack-mcp:${{ steps.meta.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

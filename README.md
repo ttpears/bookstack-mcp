@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
 [![CI](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml)
+[![HOL trust score](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3Dttpears%252Fbookstack-mcp%26metric%3Dtrust%26style%3Dflat)](https://hol.org/registry/plugins/ttpears%2Fbookstack-mcp)
 [![Node.js](https://img.shields.io/node/v/bookstack-mcp)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-compatible-7DC9D6)](https://modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,6 +15,10 @@ A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that gi
 ```bash
 npx bookstack-mcp
 ```
+
+Read the [privacy policy](./PRIVACY.md) for data flows, credentials, optional
+OAuth/Redis state, and logging. Your MCP client and deployment operator may have
+additional policies.
 
 Field notes: [Why my BookStack MCP server starts read-only](https://hackyourworld.com/bookstack-mcp-server-read-only-by-default/) covers the shared-token rate-limit failure, process-wide cache, response-size measurements, and permission boundaries that shaped the current design.
 

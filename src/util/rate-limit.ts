@@ -1,6 +1,7 @@
 import { AxiosAdapter, AxiosError } from 'axios';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { Semaphore } from './semaphore.js';
+import { PublicError } from './safe-errors.js';
 
 const MAX_RETRIES = 5;
 const MAX_DELAY_MS = 30000;
@@ -15,12 +16,12 @@ export function retryDelay(value: unknown, retry: number): number {
   return Math.min(MAX_DELAY_MS, Math.max(0, delay));
 }
 
-export class BookStackRateLimitError extends Error {
+export class BookStackRateLimitError extends PublicError {
   readonly code = 'BOOKSTACK_RATE_LIMITED';
   readonly status = 429;
 
-  constructor(readonly retryAfterMs: number, cause: unknown) {
-    super('BookStack rate limited (HTTP 429): retry budget exhausted. Try again later or reduce parallel tool calls.', { cause });
+  constructor(readonly retryAfterMs: number) {
+    super('BookStack rate limited (HTTP 429): retry budget exhausted. Try again later or reduce parallel tool calls.');
     this.name = 'BookStackRateLimitError';
   }
 }
@@ -56,7 +57,7 @@ export function rateLimitedAdapter(adapter: AxiosAdapter, limiter: Semaphore, bu
           last429 = error;
           delay = retryDelay(error.response.headers?.['retry-after'], retry + 1);
           if (retry >= MAX_RETRIES || delay >= deadline - Date.now()) {
-            throw new BookStackRateLimitError(delay, error);
+            throw new BookStackRateLimitError(delay);
           }
           console.error(`BookStack rate limited (429); retry ${retry + 1}/${MAX_RETRIES} in ${delay}ms`);
           await sleep(delay, undefined, { signal: controller.signal });
@@ -64,7 +65,7 @@ export function rateLimitedAdapter(adapter: AxiosAdapter, limiter: Semaphore, bu
       }
     } catch (error) {
       if (controller.signal.aborted && !originalSignal?.aborted) {
-        if (last429) throw new BookStackRateLimitError(delay, last429);
+        if (last429) throw new BookStackRateLimitError(delay);
         throw timeoutError;
       }
       throw error;

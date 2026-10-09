@@ -1,0 +1,37 @@
+name: HOL Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan plugin locally
+        uses: hashgraph-online/ai-plugin-scanner-action@caba2e96aa8ad2feb6cf6fca52442b52e22e779f # v1.2.635
+        with:
+          plugin_dir: '.'
+          mode: scan
+          format: markdown
+          output: '${{ runner.temp }}/hol-guard-report.md'
+          fail_on_severity: high
+          # Keep score informational while publisher policy metadata is unresolved.
+          min_score: 0
+          online: false
+          install_cisco: false
+          cisco_skill_scan: 'off'
+          upload_sarif: false
+          submission_enabled: false
+          pr_comment: 'off'
