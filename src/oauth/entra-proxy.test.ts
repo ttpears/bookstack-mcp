@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { format } from 'node:util';
 import { handleOAuthRoutes, initOAuthStore, OAuthConfig } from './entra-proxy.js';
 import { logSafeError } from '../util/safe-errors.js';
@@ -9,7 +9,8 @@ import { logSafeError } from '../util/safe-errors.js';
 test('OAuth failures omit upstream bodies/descriptions and request values; success still passes tokens', async () => {
   const cfg: OAuthConfig = {
     serverUrl: 'https://mcp.example', tenantId: 'tenant', clientId: 'application',
-    clientSecret: 'SYNTHETIC_CLIENT_SECRET', audience: 'audience', scopes: 'openid',
+    // Generated for the mocked identity endpoint, never a real credential.
+    clientSecret: `SYNTHETIC_${randomUUID()}`, audience: 'audience', scopes: 'openid',
     writeRole: 'Writer', trustProxy: false, authorizeEndpoint: 'https://identity.example/authorize',
     tokenEndpoint: 'https://identity.example/token', issuers: [], jwksUri: 'https://identity.example/keys'
   };
