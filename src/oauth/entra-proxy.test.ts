@@ -7,10 +7,11 @@ import { handleOAuthRoutes, initOAuthStore, OAuthConfig } from './entra-proxy.js
 import { logSafeError } from '../util/safe-errors.js';
 
 test('OAuth failures omit upstream bodies/descriptions and request values; success still passes tokens', async () => {
+  const syntheticToken = () => `SYNTHETIC_${randomUUID()}`;
   const cfg: OAuthConfig = {
     serverUrl: 'https://mcp.example', tenantId: 'tenant', clientId: 'application',
     // Generated for the mocked identity endpoint, never a real credential.
-    clientSecret: `SYNTHETIC_${randomUUID()}`, audience: 'audience', scopes: 'openid',
+    clientSecret: syntheticToken(), audience: 'audience', scopes: 'openid',
     writeRole: 'Writer', trustProxy: false, authorizeEndpoint: 'https://identity.example/authorize',
     tokenEndpoint: 'https://identity.example/token', issuers: [], jwksUri: 'https://identity.example/keys'
   };
@@ -41,12 +42,12 @@ test('OAuth failures omit upstream bodies/descriptions and request values; succe
     return new URL(response.headers.get('location')!).searchParams.get('state')!;
   };
   const callback = async () => originalFetch(`${base}/callback?${new URLSearchParams({ state: await pending(), code: 'SYNTHETIC_AUTH_CODE' })}`, { redirect: 'manual' });
-  const refresh = async () => originalFetch(`${base}/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'SYNTHETIC_REFRESH_INPUT' }) });
+  const refresh = async () => originalFetch(`${base}/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: syntheticToken() }) });
   try {
     for (const makeResponse of [
-      () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'SYNTHETIC_IDENTITY_DETAILS', refresh_token: 'SYNTHETIC_UPSTREAM_TOKEN' }), { status: 400 }),
+      () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'SYNTHETIC_IDENTITY_DETAILS', refresh_token: syntheticToken() }), { status: 400 }),
       () => new Response('SYNTHETIC_MALFORMED_RESPONSE', { status: 502 }),
-      () => new Response(JSON.stringify({ refresh_token: 'SYNTHETIC_TOKEN_WITHOUT_ACCESS' }), { status: 200 })
+      () => new Response(JSON.stringify({ refresh_token: syntheticToken() }), { status: 200 })
     ]) {
       upstream = makeResponse;
       const response = await callback();
@@ -64,10 +65,11 @@ test('OAuth failures omit upstream bodies/descriptions and request values; succe
     const errorState = await pending();
     const callbackError = await originalFetch(`${base}/callback?${new URLSearchParams({ state: errorState, error: 'SYNTHETIC_CALLBACK_ERROR' })}`, { redirect: 'manual' });
     assert.equal(new URL(callbackError.headers.get('location')!).searchParams.get('error'), 'invalid_request');
-    upstream = () => new Response(JSON.stringify({ access_token: 'SYNTHETIC_VALID_ACCESS', refresh_token: 'SYNTHETIC_VALID_REFRESH' }), { status: 200 });
+    const accessToken = syntheticToken();
+    upstream = () => new Response(JSON.stringify({ access_token: accessToken, refresh_token: syntheticToken() }), { status: 200 });
     const successfulRefresh = await refresh();
     assert.equal(successfulRefresh.status, 200);
-    assert.equal((await successfulRefresh.json() as any).access_token, 'SYNTHETIC_VALID_ACCESS');
+    assert.equal((await successfulRefresh.json() as any).access_token, accessToken);
     const successfulCallback = await callback();
     const code = new URL(successfulCallback.headers.get('location')!).searchParams.get('code')!;
     const mismatch = await originalFetch(`${base}/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: verifier, client_id: 'SYNTHETIC_CLIENT_ID' }) });
