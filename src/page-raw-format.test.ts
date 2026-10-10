@@ -15,7 +15,7 @@ test('get_page returns the stored editor HTML with the raw format', async () => 
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/api/pages/1') {
       res.end(JSON.stringify({
-        id: 1, book_id: 2, slug: 'page', name: 'Page',
+        id: 1, book_id: 2, slug: 'page', name: 'Page', editor: 'wysiwyg',
         html: RENDERED_HTML, raw_html: RAW_HTML, markdown: 'Included text', text: 'Included text'
       }));
     } else {
@@ -52,6 +52,8 @@ test('get_page returns the stored editor HTML with the raw format', async () => 
     assert.equal(raw.content, RAW_HTML);
     assert.equal(raw.content_total_chars, RAW_HTML.length);
     assert.equal(raw.content_truncated, false);
+    // The edit guidance tells agents to pick a format from this field.
+    assert.equal(raw.editor, 'wysiwyg');
 
     // Raw content paginates like every other format.
     const first = await getPage({ format: 'raw', limit: 20 });

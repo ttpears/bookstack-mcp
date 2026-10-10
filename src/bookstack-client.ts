@@ -377,7 +377,8 @@ export class BookStackClient {
 
     // Pick a single content format to return to avoid 3x duplication (html + markdown + text).
     // 'raw' is the stored editor HTML; unlike 'html' it has not been through BookStack's
-    // render step, so it is the safe base for content written back with update_page.
+    // render step, so it is the safe base for HTML written back with update_page.
+    // Markdown-authored pages should be edited through 'markdown' instead.
     const format = options?.format ?? 'markdown';
     const fullContent: string =
       (format === 'html' ? page.html
