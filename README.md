@@ -78,6 +78,13 @@ use these tools to order pages and chapters within a book.
 (1–180 characters), saved as the revision summary in the page's history. It
 needs BookStack v26.09 or newer; older versions silently ignore it.
 
+`get_page` accepts `format: "raw"` to return the page's stored editor HTML
+(BookStack's `raw_html`). The `html` format is the rendered view readers see:
+page includes are resolved and the content filter has run, so attributes such as
+`rel`, `data-*` or legacy `width`/`align` may be gone. When you edit a page and
+send the HTML back with `update_page`, start from `raw`; starting from `html`
+saves the rendered output and drops whatever rendering removed.
+
 > **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
 
 ## Client Configuration

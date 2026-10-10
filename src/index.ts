@@ -312,7 +312,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
       description: "Get a page. Returns one format (default markdown); use offset/limit + content_next_offset to paginate large pages.",
       inputSchema: {
         id: z.coerce.number().min(1),
-        format: z.enum(["markdown", "html", "text"]).optional().describe("Which content format to return. Defaults to markdown."),
+        format: z.enum(["markdown", "html", "text", "raw"]).optional().describe("Which content format to return. Defaults to markdown. 'html' is the rendered page as readers see it (includes resolved, content filtering applied); 'raw' is the stored editor HTML. Use 'raw' as the base for content you send back with update_page."),
         offset: z.coerce.number().min(0).optional().describe("Character offset into the content to start from (default 0)"),
         limit: z.coerce.number().min(1).max(200000).optional().describe("Max characters of content to return (default 50000)")
       }
