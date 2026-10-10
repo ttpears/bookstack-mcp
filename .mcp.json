@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "bookstack": {
+      "command": "npx",
+      "args": ["-y", "bookstack-mcp"]
+    }
+  }
+}

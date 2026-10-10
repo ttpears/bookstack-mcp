@@ -1,0 +1,23 @@
+# Dependency and build artifacts; the plugin launches the npm package with npx.
+node_modules/
+dist/
+dist-mcpb/
+*.tgz
+*.mcpb
+
+# Local credentials, client settings, and runtime state.
+.git/
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+start-mcp.sh
+logs/
+*.log
+*.pid
+*.pid.lock
+
+# Editor and OS state.
+.vscode/
+.idea/
+.DS_Store

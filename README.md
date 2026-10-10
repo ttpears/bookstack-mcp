@@ -18,7 +18,8 @@ npx bookstack-mcp
 
 Read the [privacy policy](./PRIVACY.md) for data flows, credentials, optional
 OAuth/Redis state, and logging. Your MCP client and deployment operator may have
-additional policies.
+additional policies. The [terms of use](./TERMS.md) explain the scope of the
+software under its [MIT license](./LICENSE).
 
 Field notes: [Why my BookStack MCP server starts read-only](https://hackyourworld.com/bookstack-mcp-server-read-only-by-default/) covers the shared-token rate-limit failure, process-wide cache, response-size measurements, and permission boundaries that shaped the current design.
 
@@ -95,6 +96,18 @@ When you edit a page, match the format to the page's `editor` field:
 > **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
 
 ## Client Configuration
+
+### Codex plugin
+
+This repository includes a native Codex manifest at
+`.codex-plugin/plugin.json`, which references the stdio server in `.mcp.json`.
+Set `BOOKSTACK_BASE_URL`, `BOOKSTACK_TOKEN_ID`, and `BOOKSTACK_TOKEN_SECRET` in
+the environment that launches Codex before enabling the plugin. Write operations
+remain disabled unless `BOOKSTACK_ENABLE_WRITE=true` is set.
+
+The manifest supplies the project website, privacy policy, and terms of use for
+plugin directories, including HOL. The HOL Guard CI workflow scans this manifest
+alongside the Claude and Gemini manifests; it does not submit or publish listings.
 
 ### Claude Desktop
 
