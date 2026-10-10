@@ -67,12 +67,16 @@ export interface Page {
   name: string;
   slug: string;
   html: string;
+  /** Stored editor HTML, before BookStack's render step (includes, content filtering). */
+  raw_html?: string;
   markdown: string;
   text: string;
   created_at: string;
   updated_at: string;
   owned_by: number;
 }
+
+export type PageContentFormat = 'markdown' | 'html' | 'text' | 'raw';
 
 export interface Chapter {
   id: number;
@@ -365,16 +369,21 @@ export class BookStackClient {
   }
 
   private async enhancePageResponse(page: Page, options?: {
-    format?: 'markdown' | 'html' | 'text';
+    format?: PageContentFormat;
     offset?: number;
     limit?: number;
   }): Promise<any> {
     const url = await this.generatePageUrl(page);
 
-    // Pick a single content format to return to avoid 3x duplication (html + markdown + text)
+    // Pick a single content format to return to avoid 3x duplication (html + markdown + text).
+    // 'raw' is the stored editor HTML; unlike 'html' it has not been through BookStack's
+    // render step, so it is the safe base for content written back with update_page.
     const format = options?.format ?? 'markdown';
     const fullContent: string =
-      (format === 'html' ? page.html : format === 'text' ? page.text : page.markdown) || '';
+      (format === 'html' ? page.html
+        : format === 'raw' ? page.raw_html
+        : format === 'text' ? page.text
+        : page.markdown) || '';
 
     // Character-range slicing so very large pages can be paginated
     const DEFAULT_LIMIT = 50000;
@@ -589,7 +598,7 @@ export class BookStackClient {
   }
 
   async getPage(id: number, options?: {
-    format?: 'markdown' | 'html' | 'text';
+    format?: PageContentFormat;
     offset?: number;
     limit?: number;
   }): Promise<any> {
