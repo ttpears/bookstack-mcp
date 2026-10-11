@@ -8,7 +8,8 @@
   },
   "files": [
     "dist",
-    "PRIVACY.md"
+    "PRIVACY.md",
+    "TERMS.md"
   ],
   "scripts": {
     "build": "tsc && shx chmod +x dist/*.js",

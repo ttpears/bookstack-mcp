@@ -1,0 +1,26 @@
+{
+  "name": "bookstack-mcp",
+  "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
+  "version": "5.6.0",
+  "author": {
+    "name": "Tim Pearson"
+  },
+  "homepage": "https://github.com/ttpears/bookstack-mcp",
+  "repository": "https://github.com/ttpears/bookstack-mcp",
+  "license": "MIT",
+  "keywords": ["mcp", "bookstack", "wiki", "documentation"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "BookStack",
+    "shortDescription": "Search, read, and manage your BookStack wiki",
+    "longDescription": "Connect AI assistants to your BookStack documentation. Search and read books, pages, chapters, and shelves with your BookStack API permissions. Create, update, and delete content only when write operations are explicitly enabled.",
+    "developerName": "ttpears",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/ttpears/bookstack-mcp",
+    "privacyPolicyURL": "https://github.com/ttpears/bookstack-mcp/blob/main/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/ttpears/bookstack-mcp/blob/main/TERMS.md",
+    "composerIcon": "./assets/logo.png",
+    "logo": "./assets/logo.png"
+  }
+}

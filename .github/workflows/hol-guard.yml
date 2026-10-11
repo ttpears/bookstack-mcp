@@ -19,6 +19,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate marketplace metadata
+        run: node scripts/check-plugin.mjs
+
       - name: Scan plugin locally
         uses: hashgraph-online/ai-plugin-scanner-action@caba2e96aa8ad2feb6cf6fca52442b52e22e779f # v1.2.635
         with:
@@ -26,9 +29,10 @@ jobs:
           mode: scan
           format: markdown
           output: '${{ runner.temp }}/hol-guard-report.md'
-          fail_on_severity: high
-          # Keep score informational while publisher policy metadata is unresolved.
-          min_score: 0
+          # Scan all detected manifests, including the native Codex interface.
+          # Missing marketplace policy links must block the PR.
+          fail_on_severity: medium
+          min_score: 95
           online: false
           install_cisco: false
           cisco_skill_scan: 'off'
