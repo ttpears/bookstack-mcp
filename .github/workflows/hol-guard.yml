@@ -23,7 +23,7 @@ jobs:
         run: node scripts/check-plugin.mjs
 
       - name: Scan plugin locally
-        uses: hashgraph-online/ai-plugin-scanner-action@caba2e96aa8ad2feb6cf6fca52442b52e22e779f # v1.2.635
+        uses: hashgraph-online/ai-plugin-scanner-action@6f088dedc8f1f035eddd1597de8eacd8262a3862 # v1.2.777
         with:
           plugin_dir: '.'
           mode: scan
