@@ -23,7 +23,7 @@ jobs:
         run: node scripts/check-plugin.mjs
 
       - name: Scan plugin locally
-        uses: hashgraph-online/ai-plugin-scanner-action@8db741c699f3554e9c7f4947e8954f9190332e6b # v1.2.801
+        uses: hashgraph-online/ai-plugin-scanner-action@8c2dd4f9cc381ad56496ca44aab10ce19f6bdd0f # v1.2.813
         with:
           plugin_dir: '.'
           mode: scan
@@ -39,3 +39,35 @@ jobs:
           upload_sarif: false
           submission_enabled: false
           pr_comment: 'off'
+
+  report:
+    name: Report trusted scan to HOL
+    needs: scan
+    # PRs run the read-only scan above; only main can attest a registry result.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan and report summary to HOL
+        uses: hashgraph-online/ai-plugin-scanner-action@8c2dd4f9cc381ad56496ca44aab10ce19f6bdd0f # v1.2.813
+        with:
+          plugin_dir: '.'
+          mode: scan
+          format: markdown
+          output: '${{ runner.temp }}/hol-registry-report.md'
+          min_score: 95
+          fail_on_severity: medium
+          online: false
+          install_cisco: false
+          cisco_skill_scan: 'off'
+          upload_sarif: false
+          submission_enabled: false
+          pr_comment: 'off'
+          # Sends score/counts and commit/run identity, never source or findings.
+          report_to_hol: true

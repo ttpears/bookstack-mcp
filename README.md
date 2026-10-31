@@ -125,7 +125,10 @@ remain disabled unless `BOOKSTACK_ENABLE_WRITE=true` is set.
 
 The manifest supplies the project website, privacy policy, and terms of use for
 plugin directories, including HOL. The HOL Guard CI workflow scans this manifest
-alongside the Claude and Gemini manifests; it does not submit or publish listings.
+alongside the Claude and Gemini manifests. After a passing scan on `main`, a
+separate job sends an authenticated score summary to HOL so the registry can
+show the result checked in CI. PR scans remain read-only. See
+[HOL registry setup](docs/HOL.md) for ownership verification and reporting details.
 
 ### Claude Desktop
 
