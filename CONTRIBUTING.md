@@ -1,141 +1,95 @@
-# Contributing to bookstack-mcp
+# Contributing to BookStack MCP
 
-## What this server does
+Start with the [documentation index](docs/README.md) for user-facing behavior. Use a disposable BookStack instance for manual write testing; the automated suite uses fixtures/local mock servers and does not need production credentials.
 
-`bookstack-mcp` exposes a BookStack wiki to an AI assistant (Claude Code, Cowork,
-or any MCP-compatible client) as a set of callable tools — searching pages,
-reading content, and optionally creating/editing pages and books. It's how an
-AI session answers questions out of a BookStack instance, and how it can make
-edits there if write mode is enabled.
+## Development environment
 
-## Getting it running locally
-
-**Don't point this at a production BookStack instance while developing.** Stand
-up a throwaway local copy first and point everything at that. A minimal
-`docker-compose.yml` for a disposable BookStack + database:
-
-```yaml
-services:
-  bookstack-db:
-    image: mariadb:11.4
-    environment:
-      MARIADB_ROOT_PASSWORD: local-dev-only
-      MARIADB_DATABASE: bookstack
-      MARIADB_USER: bookstack
-      MARIADB_PASSWORD: local-dev-only
-    volumes: [bookstack-db:/var/lib/mysql]
-  bookstack:
-    image: lscr.io/linuxserver/bookstack:latest
-    environment:
-      APP_URL: http://localhost:6875
-      APP_KEY: base64:SVGvKZ8b6l0Y1n4kZ0pQ2xW7mJ3rT5uH8cA1dE9fG2s=
-      DB_HOST: bookstack-db
-      DB_USERNAME: bookstack   # not DB_USER — see Gotchas
-      DB_PASSWORD: local-dev-only
-      DB_DATABASE: bookstack
-    ports: ["6875:80"]
-    depends_on: [bookstack-db]
-volumes:
-  bookstack-db:
-```
+Use **Node 24 LTS** (recommended) or Node 22, npm, and Python 3 for the HOL reporting tests. CI uses Node 22; the Docker image uses Node 24. The test command needs Node's test-file glob support introduced in Node 21, so the package's runtime `engines` minimum is not sufficient for development.
 
 ```bash
-docker compose up -d
+git clone https://github.com/ttpears/bookstack-mcp.git
+cd bookstack-mcp
+npm ci
+npm run type-check
+npm test
+npm run build
+python3 -m unittest discover -s scripts -p 'test_report_hol.py'
+node scripts/check-plugin.mjs
 ```
 
-Requires **Node 22** specifically — the test runner needs glob support that
-only landed in Node 21+, and older versions fail with a confusing "Could not
-find" error rather than anything indicating a version problem.
+`npm ci` uses the lockfile and runs the `prepare` build. The explicit build is still useful after editing source. Use `npm install` when deliberately changing dependencies and commit the lockfile with that change. Run `npm audit` when evaluating dependency security; do not apply `npm audit fix --force` without reviewing its compatibility impact.
 
-A few things that weren't obvious the first time through:
+### Run against a test wiki
 
-- BookStack's container env vars must be `DB_USERNAME`/`DB_PASSWORD`, not the
-  older LSIO-style `DB_USER`/`DB_PASS` — get the name wrong and you get a
-  silent 500 with no hint why. First container start also takes about a
-  minute for DB migrations; a 500 during that window just means it's not
-  ready yet.
-- The API token BookStack gives you (Edit Profile → API Tokens) is actually
-  **two separate values** — a Token ID and a Token Secret, both shown once on
-  the creation screen. `.env` wants both (`BOOKSTACK_TOKEN_ID` /
-  `BOOKSTACK_TOKEN_SECRET`); copying only one string will leave you stuck.
-- If you're developing over SSH and viewing BookStack from your local
-  browser, `localhost:6875` refers to your machine, not the remote host — use
-  an SSH local port-forward tunnel to reach it.
-- **`npm run dev` does not load `.env` at all** — see Gotchas below for why,
-  and what to run instead.
+Provision BookStack using its [official installation guidance](https://www.bookstackapp.com/docs/admin/installation/), on a disposable database and storage volume. Create a dedicated API user with the least permissions your test needs; enable **Access System API** and **Export Content** for WYSIWYG-to-Markdown fallback. Token ID and Secret are separate values.
 
 ```bash
-npm install
 cp .env.example .env
-# fill in BOOKSTACK_BASE_URL, BOOKSTACK_TOKEN_ID, BOOKSTACK_TOKEN_SECRET
-# BOOKSTACK_ENABLE_WRITE=true is safe against a local throwaway instance
+# Edit .env with your disposable BookStack URL and token pair.
 node --env-file=.env --import tsx src/index.ts
 ```
 
-## Running the tests
+This starts TypeScript in stdio mode and waits for an MCP client. It does not open a browser or print a prompt. `npm run dev` also runs the TypeScript entry point, but **does not load `.env` or enable file watching**. To watch explicitly:
 
 ```bash
-npm test
+node --watch --env-file=.env --import tsx src/index.ts
 ```
 
-This runs Node's built-in test runner (`node --test`) against `src/**/*.test.ts`.
-Passing looks like:
-
-```
-✔ constructor rejects max < 1
-✔ allows up to `max` holders concurrently and queues the rest
-✔ run() releases the permit even when fn throws
-✔ bounds real concurrency under a burst
-ℹ tests 4
-ℹ pass 4
-ℹ fail 0
-```
-
-Worth knowing going in: this is currently 4 tests, all covering the
-concurrency limiter (`BOOKSTACK_MAX_CONCURRENCY`) — there's no coverage yet of
-the actual BookStack API calls, error handling, or caching behavior. Coverage
-here is thin; don't treat it as representative of this project's other repos
-(`mediawiki-mcp`, `content-mcp`), which are considerably better covered.
-
-## Making a change
+For a local HTTP test using the same private `.env`:
 
 ```bash
-git switch main && git pull
-git switch -c fix/short-description   # or feat/, ci/, docs/
-# ...make your change...
-git add -A && git commit
-git push -u origin fix/short-description
-gh pr create --fill
+MCP_TRANSPORT=http MCP_HTTP_HOST=127.0.0.1 \
+  node --env-file=.env --import tsx src/index.ts
 ```
 
-Commit messages explain **why**, not what — the diff already shows what
-changed. No AI attribution lines or emoji in commits. Never commit `.env`,
-tokens, or secrets. The maintainer reviews and approves PRs; merging is safe
-and reversible once approved.
+This listens on port 8080 by default; change `MCP_HTTP_PORT` in the file if necessary. Set `MCP_TRANSPORT=http` in `.env` instead on shells without POSIX inline environment assignment. Do not expose this unauthenticated development listener publicly.
 
-## How it ships
+To test compiled code with an MCP client, configure its command as `node`, arguments as the absolute path to `dist/index.js`, and provide the required environment values. [MCP Inspector](https://github.com/modelcontextprotocol/inspector) can also inspect tools, resources, and prompts; keep tokens in private configuration rather than pasted into shared transcripts.
 
-Merging a change that bumps the version in `package.json` cuts a git tag,
-which kicks off the release workflow — but that workflow **pauses and waits
-for maintainer approval** before anything actually publishes to npm. A merge
-never ships anything on its own.
+## Repository map
 
-## Gotchas
+| Path | Responsibility |
+|---|---|
+| `src/index.ts` | Tool/resource registration, startup configuration, stdio and HTTP routing |
+| `src/bookstack-client.ts` | BookStack API calls, response shaping, editor content, slug cache |
+| `src/prompts.ts` | Four read-workflow prompt templates |
+| `src/oauth/` | Entra OAuth broker, token validation, in-memory/Redis state |
+| `src/session-registry.ts` | HTTP session lifetime and capacity |
+| `src/request-credentials.ts` | Opt-in request credential context |
+| `src/image-source.ts` | Image retrieval, file/host policy, size/type checks |
+| `src/util/` | Body limits, rate-limit handling, concurrency, safe errors, word counts |
+| `scripts/` | MCPB packaging, plugin consistency checks, HOL reporting and its tests |
+| `.github/workflows/` | CI, image previews, HOL Guard, protected releases |
 
-- **`npm run dev` (`tsx src/index.ts`) does not load `.env`.** There's no
-  `dotenv` import and no `--env-file` flag anywhere in the repo, and
-  `BOOKSTACK_BASE_URL` is read directly from `process.env` via
-  `getRequiredEnvVar`. So filling in `.env` per the setup steps silently does
-  nothing if you run the documented `npm run dev`. Use
-  `node --env-file=.env --import tsx src/index.ts` instead. The same gap
-  exists in `mediawiki-mcp`, so the real fix is likely one shared change
-  (either the `dev` script or a `dotenv` import) rather than two separate
-  patches — a known issue, not yet fixed as of this PR.
-- **Needs Node 22 specifically** for the test runner's glob support — anything
-  older fails with a misleading error.
-- **Test coverage is thin** — 4 tests, all about the concurrency limiter, and
-  it wasn't running in CI until recently.
-- **`npm install` reports a double-digit number of audit vulnerabilities** on
-  a fresh install. Worth a look eventually, not a blocker for local dev.
-- Once running, the server sits in stdio mode waiting for an MCP client to
-  talk to it — that's expected behavior, not a hang.
+## Tests and review expectations
+
+The TypeScript suite covers API tool behavior, tags, raw page source, revision summaries, images, request credentials, HTTP sessions/bodies, OAuth and atomic state consumption, safe errors, rate limits, and concurrency. Python tests cover the HOL reporting contract. The suite uses mock HTTP services and store fixtures; it does not replace testing interoperability against the BookStack/client versions affected by a change.
+
+Run the checks above before submitting code, plus targeted manual testing when behavior depends on a real wiki, Redis deployment, or client UI. For a focused test during development:
+
+```bash
+node --import tsx --test src/page-raw-format.test.ts
+```
+
+Add regression coverage for meaningful behavior changes and security boundaries. For documentation changes, check commands against the implementation, validate relative links/anchors, parse JSON/YAML examples, and verify environment names/defaults. Do not freeze a test count or audit result into documentation; both change over time.
+
+Preserve these behavior guarantees when changing tools:
+
+- Read-only defaults and BookStack permission checks; OAuth role/subject binding on reused sessions.
+- Numeric coercion for client compatibility and validation appropriate to IDs, offsets, sizes, and sort priorities.
+- Compact responses with canonical URLs; bounded page content without duplicate source fields.
+- HTML editor source versus Markdown source; full-list tag replacement semantics.
+- Sanitized errors and stderr diagnostics, with no credential or private page-body logging.
+- Explicit HTTP image-source controls and opt-in credential overrides.
+
+## Submit a change
+
+Create a focused branch, make the change, run relevant checks, then open a PR explaining the problem, resulting behavior, and validation. Update user-facing docs when tools, configuration, permissions, or deployment behavior changes. Keep `.env`, tokens, private wiki content, generated `dist/`, and package bundles out of Git.
+
+Commit messages should explain the reason for the change. Do not add AI attribution lines or emoji. CI runs type checks, tests, a build, plugin checks, and HOL Guard; non-draft PRs also build a container preview. Same-repository PRs publish that preview; forks do not.
+
+For vulnerabilities, use [private reporting](SECURITY.md#reporting-a-vulnerability) instead of a public issue containing exploit details.
+
+## Versions and releases
+
+Documentation-only changes normally need no package version bump. Runtime/package releases synchronize `package.json`, `package-lock.json`, and the Claude, Codex, and Gemini manifests. CI creates the version tag after merge, then publishing waits for the protected `release` environment approval. Follow the [release runbook](docs/RELEASING.md); never publish npm locally or remove the approval gate to bypass it.

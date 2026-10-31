@@ -28,3 +28,10 @@ instance rather than a production wiki.
 - Keep TLS certificate verification enabled.
 - Restrict HTTP image sources with `BOOKSTACK_IMAGE_ALLOWED_HOSTS`, and enable
   local image file access only for trusted callers.
+
+Use the [deployment runbook](docs/SETUP.md) and
+[configuration reference](docs/CONFIGURATION.md) for current limits, caller
+authentication, shared-account permissions, and replica/session behavior.
+Entra sign-in normally selects a shared BookStack service account; it does not
+automatically apply each user's native BookStack permissions. Redis persists
+OAuth broker state, not live MCP sessions.
