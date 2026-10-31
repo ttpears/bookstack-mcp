@@ -76,7 +76,7 @@ HTTP local files are disabled by default. If enabled, the absolute path must exi
 
 If a tag exists but npm/images are unchanged, check protected-environment approval and each publishing job. Use [release recovery](RELEASING.md#when-a-release-stalls); do not publish locally or remove the gate.
 
-A green HOL workflow establishes the scan result, not registry delivery. Check **Report summary to HOL and verify receipt** and its job summary. A HOL 403 is a reporting authorization failure; ownership verification and CI report authorization are separate. Retry after checking configuration or a temporary service failure; do not add long-lived credentials to hide it. See [HOL setup](HOL.md).
+A green HOL workflow establishes the scan result, not registry delivery. Check **Report summary to HOL and verify receipt** and its job summary. A HOL 403 can come from the edge filter or reporting authorization. The reporter supplies a project-specific user agent to avoid the edge filter's rejection of Python's default client (code 1010). Ownership verification and CI report authorization are separate. Retry after checking configuration or a temporary service failure; do not add long-lived credentials to hide it. See [HOL setup](HOL.md).
 
 ## Ask for help safely
 
