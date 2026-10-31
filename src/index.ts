@@ -727,7 +727,7 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           tags: z.array(z.object({
             name: z.string(),
             value: z.string()
-          }).strict()).optional().describe("Tags for the book")
+          }).strict()).optional().describe("Replace all book tags. Omit to preserve tags; [] removes all. Read get_book first and include any tags to keep. Use an empty value for a name-only tag.")
         }
       },
       async (args) => {
@@ -782,6 +782,10 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           chapter_id: z.coerce.number().optional().describe("Optional: Chapter ID if page should be in a chapter"),
           html: z.string().optional().describe("Optional: HTML content"),
           markdown: z.string().optional().describe("Optional: Markdown content"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Tags for the new page; use an empty value for a name-only tag"),
           changelog: z.string().min(1).max(180).optional().describe("Optional: Revision changelog message shown in the page history (BookStack v26.09+; older servers ignore it)")
         }
       },
@@ -792,7 +796,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           chapter_id: args.chapter_id,
           html: args.html,
           markdown: args.markdown,
-          changelog: args.changelog
+          changelog: args.changelog,
+          tags: args.tags
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page) }]
@@ -812,6 +817,10 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           book_id: z.coerce.number().min(1).optional().describe("Optional: Move page to this book"),
           chapter_id: z.coerce.number().optional().describe("Optional: Move page into this chapter (must belong to the target book; pass 0 to move out of any chapter)"),
           priority: z.coerce.number().int().min(0).optional().describe("Optional: Sort order (non-negative integer, lower sorts first)"),
+          tags: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+          }).strict()).optional().describe("Replace all page tags. Omit to preserve tags; [] removes all. Read get_page first and include any tags to keep. Use an empty value for a name-only tag. Can be updated without sending page content."),
           changelog: z.string().min(1).max(180).optional().describe("Optional: Revision changelog message shown in the page history (BookStack v26.09+; older servers ignore it)")
         }
       },
@@ -823,7 +832,8 @@ function registerTools(server: McpServer, client: BookStackClient, config: BookS
           book_id: args.book_id,
           chapter_id: args.chapter_id,
           priority: args.priority,
-          changelog: args.changelog
+          changelog: args.changelog,
+          tags: args.tags
         });
         return {
           content: [{ type: "text", text: JSON.stringify(page) }]
