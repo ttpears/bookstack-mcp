@@ -32,7 +32,7 @@ Before deploying:
 
 This example assumes LibreChat already uses a Docker network named `librechat`. Check its actual network name with your deployment configuration and adjust both services to share it.
 
-Create `.env` with the three required BookStack values from [`.env.example`](../.env.example). Save this as `compose.yml`:
+Create `.env` with the three required BookStack values from [`.env.example`](../.env.example). The `${VARIABLE:?}` expressions make Compose stop with its built-in error if a required value is unset or empty. Save this as `compose.yml`:
 
 ```yaml
 services:
@@ -44,9 +44,9 @@ services:
       MCP_HTTP_HOST: "0.0.0.0"
       MCP_HTTP_PORT: "8080"
       MCP_HTTP_ALLOWED_HOSTS: "bookstack-mcp,localhost,127.0.0.1"
-      BOOKSTACK_BASE_URL: "${BOOKSTACK_BASE_URL:?Set BOOKSTACK_BASE_URL}"
-      BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID:?Set BOOKSTACK_TOKEN_ID}"
-      BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET:?Set BOOKSTACK_TOKEN_SECRET}"
+      BOOKSTACK_BASE_URL: "${BOOKSTACK_BASE_URL:?}"
+      BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID:?}"
+      BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET:?}"
       BOOKSTACK_ENABLE_WRITE: "false"
     networks: [librechat]
 networks:
@@ -111,13 +111,13 @@ services:
       MCP_HTTP_ALLOWED_HOSTS: "mcp.example.com,bookstack-mcp,localhost,127.0.0.1"
       MCP_OAUTH_ENABLE: "true"
       MCP_SERVER_URL: "https://mcp.example.com"
-      OAUTH_TENANT_ID: "${OAUTH_TENANT_ID:?Set OAUTH_TENANT_ID}"
-      OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID:?Set OAUTH_CLIENT_ID}"
-      OAUTH_CLIENT_SECRET: "${OAUTH_CLIENT_SECRET:?Set OAUTH_CLIENT_SECRET}"
+      OAUTH_TENANT_ID: "${OAUTH_TENANT_ID:?}"
+      OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID:?}"
+      OAUTH_CLIENT_SECRET: "${OAUTH_CLIENT_SECRET:?}"
       OAUTH_WRITE_ROLE: "Writer"
-      BOOKSTACK_BASE_URL: "${BOOKSTACK_BASE_URL:?Set BOOKSTACK_BASE_URL}"
-      BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID:?Set BOOKSTACK_TOKEN_ID}"
-      BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET:?Set BOOKSTACK_TOKEN_SECRET}"
+      BOOKSTACK_BASE_URL: "${BOOKSTACK_BASE_URL:?}"
+      BOOKSTACK_TOKEN_ID: "${BOOKSTACK_TOKEN_ID:?}"
+      BOOKSTACK_TOKEN_SECRET: "${BOOKSTACK_TOKEN_SECRET:?}"
       BOOKSTACK_WRITE_TOKEN_ID: "${BOOKSTACK_WRITE_TOKEN_ID:-}"
       BOOKSTACK_WRITE_TOKEN_SECRET: "${BOOKSTACK_WRITE_TOKEN_SECRET:-}"
     networks: [edge]
