@@ -79,6 +79,24 @@ use these tools to order pages and chapters within a book.
 (1–180 characters), saved as the revision summary in the page's history. It
 needs BookStack v26.09 or newer; older versions silently ignore it.
 
+`create_page`, `update_page`, `create_book`, and `update_book` accept `tags`
+as an array of `{ "name": "Environment", "value": "Production" }` objects.
+Use `"value": ""` for a tag with no value. Chapter and shelf create/update
+tools also support tags.
+
+On updates, `tags` replaces the entire tag list: omit it to leave tags unchanged,
+or pass `[]` to remove all tags. To add, edit, or remove individual tags, first
+read the entity with `get_page` or `get_book`, then send the revised list,
+including every tag you want to keep. For example:
+
+```json
+{"id": 42, "tags": [{"name": "Environment", "value": "Production"}, {"name": "Reviewed", "value": ""}]}
+```
+
+Pass this to `update_page` or `update_book`. A tag-only update needs no page
+content and preserves the editor source. Tag writes require
+`BOOKSTACK_ENABLE_WRITE=true` and the corresponding BookStack edit permission.
+
 `get_page` accepts `format: "raw"` to return the page's stored editor HTML
 (BookStack's `raw_html`). The `html` format is the rendered view readers see:
 page includes are resolved and the content filter has run, so attributes such as
