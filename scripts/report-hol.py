@@ -17,6 +17,18 @@ from urllib.request import Request, urlopen
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 
 
+def record_status(message, env):
+    print(message)
+    summary = env.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as output:
+            output.write("\n### HOL registry delivery\n\n" + message + "\n")
+
+
+def failure_detail(error):
+    return f"HTTP {error.code}" if isinstance(error, HTTPError) else type(error).__name__
+
+
 def report(scan, env, opener=urlopen):
     if (env.get("GITHUB_SERVER_URL") != "https://github.com"
             or env.get("GITHUB_REF") != "refs/heads/main"
@@ -63,7 +75,7 @@ def report(scan, env, opener=urlopen):
     listings = receipt.get("listings")
     if type(listings) is not int or listings < 1:
         raise ValueError("HOL did not confirm a listing update")
-    print(f"HOL CI report: sent ({listings} listing(s) updated)")
+    record_status(f"HOL CI report: sent ({listings} listing(s) updated)", env)
 
 
 if __name__ == "__main__":
@@ -71,6 +83,9 @@ if __name__ == "__main__":
         report(json.loads(Path(sys.argv[1]).read_text()), os.environ)
     except Exception as error:
         # Upstream responses and token values must never reach job logs.
-        detail = f"HTTP {error.code}" if isinstance(error, HTTPError) else type(error).__name__
-        print(f"HOL CI report failed: {detail}", file=sys.stderr)
+        detail = failure_detail(error)
+        if isinstance(error, HTTPError):
+            error.close()
+        record_status(f"HOL CI report failed: {detail}; registry delivery is unconfirmed.", os.environ)
+        print(f"::warning title=HOL registry reporting::Delivery not confirmed ({detail}).")
         sys.exit(1)

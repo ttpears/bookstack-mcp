@@ -89,6 +89,17 @@ export class SessionRegistry {
     return this.sessionAuth[sessionId];
   }
 
+  /** A session's tool set and upstream token must match every request's roles. */
+  validateAuth(sessionId: string, current: SessionAuthBinding | null): 'ok' | 'forbidden' | 'permissions_changed' {
+    const bound = this.getAuth(sessionId);
+    if (!bound?.sub || !current?.sub || bound.sub !== current.sub) return 'forbidden';
+    if (bound.isWriter !== current.isWriter) {
+      this.evict(sessionId);
+      return 'permissions_changed';
+    }
+    return 'ok';
+  }
+
   atCapacity(): boolean {
     return this.size() >= this.maxSessions;
   }

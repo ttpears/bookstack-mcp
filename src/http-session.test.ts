@@ -73,6 +73,7 @@ before(async () => {
         MCP_HTTP_HOST: "127.0.0.1",
         MCP_HTTP_PORT: String(PORT),
         MCP_OAUTH_ENABLE: "false",
+        MCP_HTTP_MAX_BODY_BYTES: '1024',
         // Never contacted: no test here invokes a tool.
         BOOKSTACK_BASE_URL: "http://127.0.0.1:9/unused",
         BOOKSTACK_TOKEN_ID: "test",
@@ -88,6 +89,17 @@ after(() => {
 });
 
 describe("Streamable HTTP session contract", () => {
+  test('oversized MCP bodies return 413 and malformed JSON returns 400', async () => {
+    for (const [body, status] of [['x'.repeat(1025), 413], ['{', 400]] as const) {
+      const response = await fetch(MCP, { method: 'POST', headers: MCP_HEADERS, body });
+      assert.equal(response.status, status);
+      const error = await response.json() as any;
+      assert.ok(error.error.message);
+    }
+    const health = await fetch(`${BASE}/health`);
+    assert.equal(health.status, 200, 'oversized requests must not stop the server');
+    await health.text();
+  });
   test("initialize issues a session id", async () => {
     const res = await fetch(MCP, {
       method: "POST",

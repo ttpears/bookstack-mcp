@@ -44,6 +44,11 @@ test('OAuth failures omit upstream bodies/descriptions and request values; succe
   const callback = async () => originalFetch(`${base}/callback?${new URLSearchParams({ state: await pending(), code: 'SYNTHETIC_AUTH_CODE' })}`, { redirect: 'manual' });
   const refresh = async () => originalFetch(`${base}/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: syntheticToken() }) });
   try {
+    for (const path of ['/register', '/token']) {
+      const oversized = await originalFetch(`${base}${path}`, { method: 'POST', body: 'x'.repeat(65537) });
+      assert.equal(oversized.status, 413);
+      assert.equal((await oversized.json() as any).error, 'invalid_request');
+    }
     for (const makeResponse of [
       () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'SYNTHETIC_IDENTITY_DETAILS', refresh_token: syntheticToken() }), { status: 400 }),
       () => new Response('SYNTHETIC_MALFORMED_RESPONSE', { status: 502 }),
@@ -71,7 +76,21 @@ test('OAuth failures omit upstream bodies/descriptions and request values; succe
     assert.equal(successfulRefresh.status, 200);
     assert.equal((await successfulRefresh.json() as any).access_token, accessToken);
     const successfulCallback = await callback();
-    const code = new URL(successfulCallback.headers.get('location')!).searchParams.get('code')!;
+    const replayState = await pending();
+    const replayCallbacks = await Promise.all(Array.from({ length: 8 }, () => originalFetch(
+      `${base}/callback?${new URLSearchParams({ state: replayState, code: 'SYNTHETIC_AUTH_CODE' })}`, { redirect: 'manual' }
+    )));
+    assert.equal(replayCallbacks.filter(r => r.status === 302).length, 1);
+    for (const response of replayCallbacks) await response.text();
+    const consumeCode = new URL(successfulCallback.headers.get('location')!).searchParams.get('code')!;
+    const exchanges = await Promise.all(Array.from({ length: 8 }, () => originalFetch(`${base}/token`, {
+      method: 'POST', body: new URLSearchParams({ grant_type: 'authorization_code', code: consumeCode,
+        code_verifier: verifier, client_id: clientId })
+    })));
+    assert.equal(exchanges.filter(r => r.status === 200).length, 1, 'a code must be redeemed only once');
+    for (const response of exchanges) await response.text();
+    const mismatchCallback = await callback();
+    const code = new URL(mismatchCallback.headers.get('location')!).searchParams.get('code')!;
     const mismatch = await originalFetch(`${base}/token`, { method: 'POST', body: new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: verifier, client_id: 'SYNTHETIC_CLIENT_ID' }) });
     assert.equal((await mismatch.json() as any).error, 'invalid_client');
     assert.doesNotMatch(logs.join('\n'), /SYNTHETIC/);

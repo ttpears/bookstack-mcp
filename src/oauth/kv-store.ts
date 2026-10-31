@@ -7,6 +7,7 @@ const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface KvStore {
   get<T>(key: string): Promise<T | undefined>;
+  take<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T, ttlMs: number): Promise<void>;
   del(key: string): Promise<void>;
   dispose(): void;
@@ -39,6 +40,13 @@ export class InMemoryKvStore implements KvStore {
     this.map.set(this.prefix + key, { value, expiresAt: Date.now() + ttlMs });
   }
 
+  async take<T>(key: string): Promise<T | undefined> {
+    const entry = this.map.get(this.prefix + key);
+    // No await between lookup and deletion: concurrent consumers get one winner.
+    this.map.delete(this.prefix + key);
+    return entry && entry.expiresAt > Date.now() ? entry.value as T : undefined;
+  }
+
   async del(key: string): Promise<void> {
     this.map.delete(this.prefix + key);
   }
@@ -53,6 +61,7 @@ interface RedisLike {
   set(key: string, value: string, mode: string, ttl: number): Promise<unknown>;
   del(key: string): Promise<unknown>;
   quit(): Promise<unknown>;
+  eval(script: string, numKeys: number, key: string): Promise<unknown>;
 }
 
 /** Redis-backed store. TTL enforced by Redis (PX); no sweep needed. */
@@ -62,6 +71,15 @@ export class RedisKvStore implements KvStore {
   async get<T>(key: string): Promise<T | undefined> {
     const raw = await this.client.get(this.prefix + key);
     return raw == null ? undefined : (JSON.parse(raw) as T);
+  }
+
+  async take<T>(key: string): Promise<T | undefined> {
+    // Atomic GET+DEL also works on Redis versions predating GETDEL (6.2).
+    const raw = await this.client.eval(
+      "local value = redis.call('GET', KEYS[1]); redis.call('DEL', KEYS[1]); return value",
+      1, this.prefix + key
+    );
+    return raw == null ? undefined : JSON.parse(String(raw)) as T;
   }
 
   async set<T>(key: string, value: T, ttlMs: number): Promise<void> {

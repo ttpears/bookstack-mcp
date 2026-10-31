@@ -5,6 +5,8 @@ import importlib.util
 import io
 import json
 import unittest
+import tempfile
+from urllib.error import HTTPError
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -14,6 +16,18 @@ spec.loader.exec_module(module)
 
 
 class ReportingTests(unittest.TestCase):
+    def test_delivery_summary_and_errors_exclude_response_bodies(self):
+        failure = HTTPError('https://private.invalid', 403, 'private response details', {}, None)
+        self.assertEqual(module.failure_detail(failure), 'HTTP 403')
+        failure.close()
+        self.assertEqual(module.failure_detail(RuntimeError('private exception')), 'RuntimeError')
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'summary.md'
+            with contextlib.redirect_stdout(io.StringIO()):
+                module.record_status('HOL CI report failed: HTTP 403', {'GITHUB_STEP_SUMMARY': str(path)})
+            self.assertIn('HTTP 403', path.read_text())
+            self.assertNotIn('private', path.read_text())
+
     def setUp(self):
         self.env = {
             "GITHUB_SERVER_URL": "https://github.com",

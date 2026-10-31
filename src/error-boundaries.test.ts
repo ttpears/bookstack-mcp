@@ -60,8 +60,10 @@ for (const mode of ['stdio', 'http'] as const) {
         http = new StreamableHTTPClientTransport(new URL(`${host}/mcp`));
         await client.connect(http);
         const malformed = await fetch(`${host}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'SYNTHETIC_MALFORMED_BODY' });
-        assert.equal(malformed.status, 500);
-        assert.doesNotMatch(await malformed.text(), /SYNTHETIC/);
+        assert.equal(malformed.status, 400);
+        const malformedBody = await malformed.text();
+        assert.doesNotMatch(malformedBody, /SYNTHETIC/);
+        assert.equal(JSON.parse(malformedBody).error.code, -32700);
       }
       const failedRead = await client.callTool({ name: 'get_book', arguments: { id: 1 } });
       assert.equal(failedRead.isError, true);
@@ -93,7 +95,6 @@ for (const mode of ['stdio', 'http'] as const) {
       await new Promise<void>(resolve => api.close(() => resolve()));
     }
     assert.doesNotMatch(logs, /SYNTHETIC/);
-    if (mode === 'http') assert.match(logs, /HTTP handler error/);
   });
 }
 
