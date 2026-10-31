@@ -45,6 +45,9 @@ jobs:
 
   report:
     name: Report trusted scan to HOL
+    # Registry availability must not change the independent scanner verdict.
+    # Delivery still requires a receipt and failures remain visible in this job.
+    continue-on-error: true
     needs: scan
     # PRs run the read-only scan above; only main can attest a registry result.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

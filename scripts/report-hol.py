@@ -50,12 +50,14 @@ def report(scan, env, opener=urlopen):
         token_url + separator + "audience=" + quote(audience, safe=""),
         headers={"Authorization": "Bearer " + env["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
     )
+    print("HOL CI report: requesting GitHub identity", file=sys.stderr, flush=True)
     with opener(token_request, timeout=15) as response:
         token = json.load(response)["value"]
     request = Request(
         "https://hol.org/api/plugins/ci-reports", data=body, method="POST",
         headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
     )
+    print("HOL CI report: submitting summary to HOL", file=sys.stderr, flush=True)
     with opener(request, timeout=15) as response:
         receipt = json.load(response)
     listings = receipt.get("listings")
