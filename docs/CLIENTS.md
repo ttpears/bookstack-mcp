@@ -33,14 +33,14 @@ Export the three required `BOOKSTACK_*` variables in the environment that starts
 /plugin install bookstack-mcp@ttpears-plugins
 ```
 
-The plugin manifest starts `npx -y bookstack-mcp` and inherits the process environment. Restart Claude Code after changing it. Do not register a second manual copy under another name unless you intentionally want two connections.
+The plugin manifest starts `npx -y bookstack-mcp@5.7.1` and inherits the process environment. Its package version is pinned to the matching release. Restart Claude Code after changing it. Do not register a second manual copy under another name unless you intentionally want two connections.
 
 ### Direct MCP registration
 
 With the required variables already exported, register a user-scoped server:
 
 ```bash
-claude mcp add --transport stdio --scope user bookstack -- npx -y bookstack-mcp
+claude mcp add --transport stdio --scope user bookstack -- npx -y bookstack-mcp@5.7.1
 ```
 
 The server inherits the environment when Claude Code launches it, so keep those variables available in future sessions. For fixed private settings, use the client's environment configuration; avoid putting real secrets into commands that shell history records.
@@ -60,10 +60,16 @@ The repository provides a native manifest at [`.codex-plugin/plugin.json`](../.c
 For Codex CLI, direct MCP registration is also available:
 
 ```bash
-codex mcp add bookstack -- npx -y bookstack-mcp
+codex mcp add bookstack -- npx -y bookstack-mcp@5.7.1
 ```
 
 As with the native plugin, future Codex launches need the exported variables. Writes stay disabled unless explicitly enabled. Use either the native plugin or direct registration to avoid duplicate tool entries.
+
+## Cursor
+
+The repository provides [`.cursor-plugin/plugin.json`](../.cursor-plugin/plugin.json), referencing the same pinned stdio configuration as Codex. In a Cursor version supporting repository plugins, use its plugin installation flow and configure the required BookStack environment variables in the environment launching Cursor. This manifest does not imply acceptance into the Cursor Marketplace.
+
+For manual MCP setup, use the [README JSON configuration](../README.md#3-configure-a-local-mcp-client) in Cursor's private MCP settings. GUI launches may not inherit shell exports; the manual `env` configuration makes the required values explicit. Keep it outside version control. Use either the plugin or manual connection to avoid duplicate tools. See [Cursor's plugin reference](https://cursor.com/docs/reference/plugins) for version-specific installation behavior.
 
 ## Gemini CLI
 
@@ -85,7 +91,7 @@ Add this to a private `librechat.yaml`, using your deployment's secret handling 
 mcpServers:
   bookstack:
     command: npx
-    args: ["-y", "bookstack-mcp"]
+    args: ["-y", "bookstack-mcp@5.7.1"]
     env:
       BOOKSTACK_BASE_URL: "https://wiki.example.com"
       BOOKSTACK_TOKEN_ID: "your-token-id"

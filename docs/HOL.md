@@ -53,10 +53,32 @@ workflow proves that the owner claim has completed.
 
 ## Releases
 
-Runtime/package changes use synchronized npm, Claude, Codex, and Gemini versions.
+Runtime/package changes use synchronized npm, Claude, Codex, Cursor, and Gemini versions,
+including exact npm package pins in the plugin launchers.
 Merging a version bump creates the release tag through CI. The release workflow
 then waits for the repository's protected `release` environment approval before
 publishing npm, container images, the GitHub release, and the MCPB bundle.
 Approve the specific validated run in GitHub; keep the environment protection
 and OIDC trusted publishing in place. Workflow-only HOL configuration changes
 do not require an npm release.
+
+## Directory pre-flight and public scores
+
+The [directory pre-flight](https://hol.org/plugins/preflight?repo=ttpears%2Fbookstack-mcp)
+checks the current default-branch commit against published Claude, Codex, and
+Cursor directory rules. It is separate from the scanner and the public registry's
+indexed snapshot. A passing pre-flight does not refresh that snapshot, deliver a
+CI report, or mean a directory has accepted the plugin.
+
+Plugin launchers pin the exact published npm version, and Gemini and Cursor reuse
+the small icon in `assets/logo.png`. Keep individual plugin files below 5 MiB.
+The native Cursor manifest shares `.mcp.json` with Codex. A lockfile can trigger
+manual dependency review in the Claude pre-flight; keep the lockfile for
+reproducible builds rather than removing it to change that review result.
+
+If the public page reports findings already fixed in the repository, compare its
+displayed version and source commit with the current manifest and the latest
+trusted-main scan. In the owner dashboard, **Directory and release evidence**
+shows the pre-flight commit separately from **CI scanner reports**. An empty CI
+report list means there is no accepted report visible there; check the workflow's
+delivery receipt and any authorization failure before claiming scores updated.

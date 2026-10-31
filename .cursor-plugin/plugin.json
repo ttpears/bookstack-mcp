@@ -1,0 +1,14 @@
+{
+  "name": "bookstack-mcp",
+  "version": "5.7.1",
+  "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
+  "author": {
+    "name": "Tim Pearson"
+  },
+  "homepage": "https://github.com/ttpears/bookstack-mcp",
+  "repository": "https://github.com/ttpears/bookstack-mcp",
+  "license": "MIT",
+  "keywords": ["mcp", "bookstack", "wiki", "documentation"],
+  "logo": "assets/logo.png",
+  "mcpServers": "./.mcp.json"
+}

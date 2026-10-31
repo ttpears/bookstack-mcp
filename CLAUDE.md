@@ -32,7 +32,7 @@ When editing pages, preserve the editor format: stored raw HTML for WYSIWYG, Mar
 
 ## Packaging and releases
 
-The npm package includes `dist`, `PRIVACY.md`, and `TERMS.md`; npm also includes standard README/license metadata. Plugin manifests and the MCPB template live in their respective root directories. Run `scripts/check-plugin.mjs` after metadata changes.
+The npm package includes `dist`, `PRIVACY.md`, and `TERMS.md`; npm also includes standard README/license metadata. Claude, Codex, Cursor, and Gemini manifests share the same package version and exact npm launcher pin. Keep plugin assets below 5 MiB and reuse `assets/logo.png`. Run `scripts/check-plugin.mjs` after metadata changes.
 
 Releases use [docs/RELEASING.md](docs/RELEASING.md). Synchronize all package/plugin versions for a runtime release. CI tags after merge; the release workflow waits for protected-environment approval, then publishes npm with OIDC provenance, the GitHub release/MCPB, and container images. Never run `npm publish` locally, add an `NPM_TOKEN`, manually bypass tagging, or weaken the release approval gate. Documentation-only changes normally do not need a release.
 
