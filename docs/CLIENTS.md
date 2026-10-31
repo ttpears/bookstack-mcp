@@ -30,7 +30,7 @@ Export the three required `BOOKSTACK_*` variables in the environment that starts
 
 ```text
 /plugin marketplace add ttpears/claude-plugins
-/plugin install bookstack-mcp@ttpears-plugins
+/plugin install bookstack-mcp@ttpears
 ```
 
 The plugin manifest starts `npx -y bookstack-mcp@5.7.1` and inherits the process environment. Its package version is pinned to the matching release. Restart Claude Code after changing it. Do not register a second manual copy under another name unless you intentionally want two connections.
