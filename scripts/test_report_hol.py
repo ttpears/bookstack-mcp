@@ -83,6 +83,27 @@ class ReportingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.report(scan, self.env, lambda *args, **kwargs: self.fail("network access"))
 
+    def test_hol_edge_filter_accepts_identified_reporter(self):
+        requests = []
+
+        def opener(request, timeout):
+            requests.append(request)
+            if len(requests) == 1:
+                return io.BytesIO(b'{"value":"oidc-secret"}')
+            agent = request.get_header("User-agent", "Python-urllib/3.12")
+            if agent.startswith("Python-urllib"):
+                raise HTTPError(request.full_url, 403, "Forbidden", {},
+                                io.BytesIO(b"error code: 1010"))
+            self.assertIn("bookstack-mcp", agent)
+            self.assertIn("https://github.com/ttpears/bookstack-mcp", agent)
+            return io.BytesIO(b'{"listings":1}')
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            module.report(self.scan, self.env, opener)
+        self.assertEqual(len(requests), 2)
+        self.assertIn("sent (1 listing(s) updated)", output.getvalue())
+
     def test_receipt_must_confirm_an_updated_listing(self):
         for receipt in [{}, {"listings": 0}, {"listings": True}]:
             calls = []

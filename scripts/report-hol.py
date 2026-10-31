@@ -15,6 +15,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
+USER_AGENT = "bookstack-mcp-hol-ci/1.0 (+https://github.com/ttpears/bookstack-mcp)"
 
 
 def record_status(message, env):
@@ -67,7 +68,9 @@ def report(scan, env, opener=urlopen):
         token = json.load(response)["value"]
     request = Request(
         "https://hol.org/api/plugins/ci-reports", data=body, method="POST",
-        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        # HOL's edge filter rejects urllib's default Python-urllib user agent.
+        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                 "User-Agent": USER_AGENT},
     )
     print("HOL CI report: submitting summary to HOL", file=sys.stderr, flush=True)
     with opener(request, timeout=15) as response:

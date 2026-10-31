@@ -36,6 +36,8 @@ The v1.2.813 action advertises reporting but its packaged scanner 3.58.0 does no
 implement that input. A small repository script uses HOL's published OIDC
 contract to send only allowlisted summary fields and require a delivery receipt.
 It can be removed when a verified scanner release includes native reporting.
+The reporter identifies itself with a project-specific HTTP user agent because
+HOL's edge filter rejects Python's default user agent with HTTP 403 (code 1010).
 
 Check **Report summary to HOL and verify receipt** for a `sent` receipt and the
 number of listings updated. Reporting failures remain visible in the reporting
