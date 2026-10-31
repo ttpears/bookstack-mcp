@@ -13,7 +13,7 @@ Choose patch/minor/major according to compatibility impact. Describe resulting b
 ## Prepare the PR
 
 1. Update `package.json` and `package-lock.json` together, for example `npm version patch --no-git-tag-version` for a patch release.
-2. Set the exact same version in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, and `gemini-extension.json`. The MCPB builder reads `package.json`.
+2. Set the exact same version in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, and `gemini-extension.json`. Update the `bookstack-mcp@X.Y.Z` launcher arguments in `.mcp.json`, the Claude manifest, and the Gemini extension to that version too. The MCPB builder reads `package.json`. Refresh versioned client examples when changing the recommended release.
 3. Add `docs/releases/vX.Y.Z.md` when useful, and link it from the [release-note index](releases/README.md). GitHub's workflow also generates notes from merged changes.
 4. Run validation:
 

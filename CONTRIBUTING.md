@@ -92,4 +92,4 @@ For vulnerabilities, use [private reporting](SECURITY.md#reporting-a-vulnerabili
 
 ## Versions and releases
 
-Documentation-only changes normally need no package version bump. Runtime/package releases synchronize `package.json`, `package-lock.json`, and the Claude, Codex, and Gemini manifests. CI creates the version tag after merge, then publishing waits for the protected `release` environment approval. Follow the [release runbook](docs/RELEASING.md); never publish npm locally or remove the approval gate to bypass it.
+Documentation-only changes normally need no package version bump. Runtime/package releases synchronize `package.json`, `package-lock.json`, the Claude, Codex, Cursor, and Gemini manifests, and their exact npm launcher pins. CI creates the version tag after merge, then publishing waits for the protected `release` environment approval. Follow the [release runbook](docs/RELEASING.md); never publish npm locally or remove the approval gate to bypass it.

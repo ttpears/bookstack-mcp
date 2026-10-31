@@ -2,7 +2,7 @@
   "mcpServers": {
     "bookstack": {
       "command": "npx",
-      "args": ["-y", "bookstack-mcp"]
+      "args": ["-y", "bookstack-mcp@5.7.1"]
     }
   }
 }

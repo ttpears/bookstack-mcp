@@ -20,7 +20,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "bookstack-mcp"
+        "bookstack-mcp@5.7.1"
       ]
     }
   }

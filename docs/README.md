@@ -4,7 +4,7 @@ Start with the [README quick start](../README.md#quick-start), then choose the g
 
 | I want to… | Guide |
 |---|---|
-| Connect Claude Desktop, Claude Code, Codex, Gemini CLI, or LibreChat | [Client configuration](CLIENTS.md) |
+| Connect Claude Desktop, Claude Code, Codex, Cursor, Gemini CLI, or LibreChat | [Client configuration](CLIENTS.md) |
 | Deploy an internal container or HTTPS connector with Entra sign-in | [Deployment runbook](SETUP.md) |
 | Look up environment variables and permission behavior | [Configuration reference](CONFIGURATION.md) |
 | Search, paginate, edit safely, upload images, or export content | [Tools and recipes](TOOLS.md) |

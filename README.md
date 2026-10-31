@@ -26,6 +26,7 @@ Also grant **Export Content** to read WYSIWYG pages as Markdown: BookStack store
 | Claude Desktop | Install the `.mcpb` bundle from the [latest release](https://github.com/ttpears/bookstack-mcp/releases/latest) under **Settings → Extensions**, then enter the three BookStack settings |
 | Claude Code | [Marketplace or direct CLI setup](docs/CLIENTS.md#claude-code) |
 | Codex or Gemini CLI | [Native plugin and extension setup](docs/CLIENTS.md#codex) |
+| Cursor | [Native plugin or manual MCP setup](docs/CLIENTS.md#cursor) |
 | Any local MCP client | Use the stdio configuration below |
 | LibreChat / shared Docker service | [Internal HTTP deployment](docs/SETUP.md#internal-http-service) |
 | Remote connector with Microsoft sign-in | [HTTPS and Entra OAuth deployment](docs/SETUP.md#public-connector-with-entra-oauth) |
@@ -41,7 +42,7 @@ Add this entry to your client's MCP configuration, replacing the example values:
   "mcpServers": {
     "bookstack": {
       "command": "npx",
-      "args": ["-y", "bookstack-mcp"],
+      "args": ["-y", "bookstack-mcp@5.7.1"],
       "env": {
         "BOOKSTACK_BASE_URL": "https://wiki.example.com",
         "BOOKSTACK_TOKEN_ID": "your-token-id",
@@ -52,13 +53,13 @@ Add this entry to your client's MCP configuration, replacing the example values:
 }
 ```
 
-This configuration contains credentials: keep it private and outside version control. For a reviewed, fixed version, replace `bookstack-mcp` with `bookstack-mcp@5.7.1`; otherwise npm resolves the current release when the client starts it.
+This configuration contains credentials: keep it private and outside version control. It pins the reviewed release `5.7.1`; update the exact version deliberately when upgrading. The repository's native plugin/extension launchers also pin a matching npm version.
 
 Restart the client, check that BookStack tools appear, and ask: **“List the books I can access, then find our onboarding guide and link to it.”** This verifies MCP connectivity and BookStack access. Starting `npx` without the required settings fails; starting it in a terminal with settings waits for MCP input rather than opening a web interface.
 
 ## Client Configuration
 
-The [client guide](docs/CLIENTS.md) covers Claude Desktop, Claude Code, Codex, Gemini CLI, and LibreChat, including per-user HTTP credential headers. The [configuration reference](docs/CONFIGURATION.md) documents all server settings and the different npm and Docker defaults.
+The [client guide](docs/CLIENTS.md) covers Claude Desktop, Claude Code, Codex, Cursor, Gemini CLI, and LibreChat, including per-user HTTP credential headers. The [configuration reference](docs/CONFIGURATION.md) documents all server settings and the different npm and Docker defaults.
 
 For development from a checkout, see [CONTRIBUTING.md](CONTRIBUTING.md). The server does not automatically read `.env`; use the client's `env` settings, export variables, or explicitly pass Node's `--env-file` option.
 
