@@ -36,8 +36,10 @@ contract to send only allowlisted summary fields and require a delivery receipt.
 It can be removed when a verified scanner release includes native reporting.
 
 Check **Report summary to HOL and verify receipt** for a `sent` receipt and the
-number of listings updated. Reporting failures fail the reporting job separately
-from the scan. Retry a temporary delivery
+number of listings updated. Reporting failures remain visible in the reporting
+job but do not change the scanner verdict or fail the overall workflow. A green
+workflow without a delivery receipt does not establish registry delivery.
+Retry a temporary delivery
 failure by manually running the workflow on `main`; investigate persistent errors
 using the logged status, without adding long-lived credentials.
 
