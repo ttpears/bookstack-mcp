@@ -8,9 +8,12 @@ const readJson = (path) => JSON.parse(readFileSync(new URL(path, root), 'utf8'))
 const pkg = readJson('package.json');
 const manifest = readJson('.codex-plugin/plugin.json');
 const claude = readJson('.claude-plugin/plugin.json');
+const gemini = readJson('gemini-extension.json');
 
 assert.equal(manifest.name, pkg.name, 'Codex plugin name must match the npm package');
 assert.equal(manifest.version, pkg.version, 'Codex plugin version must match the npm package');
+assert.equal(claude.version, pkg.version, 'Claude plugin version must match the npm package');
+assert.equal(gemini.version, pkg.version, 'Gemini extension version must match the npm package');
 assert.equal(manifest.mcpServers, './.mcp.json', 'Codex must reference the scanned MCP config');
 assert.deepEqual(readJson('.mcp.json').mcpServers, claude.mcpServers,
   'Codex and Claude must launch the same BookStack server');
