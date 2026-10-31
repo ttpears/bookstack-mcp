@@ -15,6 +15,7 @@ import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { KvStore, InMemoryKvStore, createStore } from "./kv-store.js";
 import { logSafeError, oauthErrorCode } from "../util/safe-errors.js";
+import { HttpBodyError, readRequestBody } from "../util/http-body.js";
 
 export interface OAuthConfig {
   serverUrl: string; // public HTTPS base URL of THIS server, no trailing slash
@@ -145,13 +146,17 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-    req.on("error", reject);
-  });
+async function readBody(req: IncomingMessage, res: ServerResponse): Promise<string | undefined> {
+  try {
+    return await readRequestBody(req, { maxBytes: 64 * 1024 });
+  } catch (error) {
+    if (!(error instanceof HttpBodyError)) throw error;
+    if (!req.aborted) {
+      res.setHeader('Connection', 'close');
+      sendJson(res, error.status, { error: 'invalid_request', error_description: error.message });
+    }
+    return undefined;
+  }
 }
 
 function parseForm(raw: string): Record<string, string> {
@@ -272,9 +277,11 @@ export async function handleOAuthRoutes(
 
   // RFC 7591 — Dynamic Client Registration (handled locally)
   if (path === "/register" && req.method === "POST") {
+    const raw = await readBody(req, res);
+    if (raw === undefined) return true;
     let meta: any = {};
     try {
-      meta = JSON.parse((await readBody(req)) || "{}");
+      meta = JSON.parse(raw || "{}");
     } catch {
       sendJson(res, 400, { error: "invalid_client_metadata" });
       return true;
@@ -350,12 +357,11 @@ export async function handleOAuthRoutes(
     const upstreamState = q.get("state") ?? "";
     const code = q.get("code") ?? "";
     const err = q.get("error");
-    const p = await store.get<PendingAuth>(`pending:${upstreamState}`);
+    const p = await store.take<PendingAuth>(`pending:${upstreamState}`);
     if (!p) {
       sendJson(res, 400, { error: "invalid_state" });
       return true;
     }
-    await store.del(`pending:${upstreamState}`);
     if (err || !code) {
       const dest = new URL(p.clientRedirectUri);
       dest.searchParams.set("error", oauthErrorCode(err, 'invalid_request'));
@@ -412,17 +418,18 @@ export async function handleOAuthRoutes(
 
   // Token endpoint — code exchange (verify PKCE) and refresh pass-through.
   if (path === "/token" && req.method === "POST") {
-    const form = parseForm(await readBody(req));
+    const raw = await readBody(req, res);
+    if (raw === undefined) return true;
+    const form = parseForm(raw);
     const grant = form["grant_type"];
 
     if (grant === "authorization_code") {
-      const issued = await store.get<IssuedCode>(`code:${form["code"] ?? ""}`);
+      const issued = await store.take<IssuedCode>(`code:${form["code"] ?? ""}`);
       if (!issued) {
         console.error("[oauth] /token authorization_code: invalid_grant (code not found/expired)");
         sendJson(res, 400, { error: "invalid_grant" });
         return true;
       }
-      await store.del(`code:${form["code"]!}`);
       const verifier = form["code_verifier"] ?? "";
       if (!verifier || s256(verifier) !== issued.codeChallenge) {
         console.error(`[oauth] /token authorization_code: PKCE FAILED (verifier=${verifier ? "present" : "missing"})`);

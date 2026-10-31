@@ -23,6 +23,8 @@ pull requests, a weekly schedule, and manual dispatch. It scans local repository
 content with an immutable action SHA, verified scanner provenance, no persisted
 checkout credentials, and a minimum score of 95 with medium-or-higher findings
 blocking CI. Plugin policy links and synchronized versions are checked first.
+Scanner reports are retained as downloadable GitHub Actions artifacts for
+14 days, including reports from failed scans.
 
 PR scans have only `contents: read`. After the scan passes on `main`, a separate
 job uses GitHub OIDC (`id-token: write`) to report the score, grade, finding counts,
@@ -39,6 +41,8 @@ Check **Report summary to HOL and verify receipt** for a `sent` receipt and the
 number of listings updated. Reporting failures remain visible in the reporting
 job but do not change the scanner verdict or fail the overall workflow. A green
 workflow without a delivery receipt does not establish registry delivery.
+Delivery status also appears in the job summary; failures produce a warning
+without copying upstream response bodies or credentials into GitHub.
 Retry a temporary delivery
 failure by manually running the workflow on `main`; investigate persistent errors
 using the logged status, without adding long-lived credentials.

@@ -23,6 +23,7 @@ import {
 import { SessionRegistry } from "./session-registry.js";
 import { parseRequestCredentials, requestScopedClient, withRequestCredentials } from "./request-credentials.js";
 import { PublicError, logSafeError, safeError, safeUrlOrigin } from "./util/safe-errors.js";
+import { HttpBodyError, readRequestBody } from "./util/http-body.js";
 
 // App-level config: the read-only credential is always present; the write credential and
 // OAuth proxy are optional. In OAuth mode the per-session credential is chosen by role.
@@ -1161,17 +1162,18 @@ async function startHttp(config: AppConfig): Promise<void> {
 
   const sessions = new SessionRegistry({ idleTtlMs, maxSessions });
 
-  const readJsonBody = (req: IncomingMessage): Promise<unknown> =>
-    new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      req.on("data", (c: Buffer) => chunks.push(c));
-      req.on("end", () => {
-        const raw = Buffer.concat(chunks).toString("utf8");
-        if (!raw) return resolve(undefined);
-        try { resolve(JSON.parse(raw)); } catch (e) { reject(e); }
-      });
-      req.on("error", reject);
-    });
+  const maxBodyRaw = process.env.MCP_HTTP_MAX_BODY_BYTES;
+  const maxBodyBytes = maxBodyRaw === undefined ? 10 * 1024 * 1024 : Number(maxBodyRaw);
+  if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1) {
+    throw new PublicError('MCP_HTTP_MAX_BODY_BYTES must be a positive integer');
+  }
+
+  const readJsonBody = async (req: IncomingMessage): Promise<unknown> => {
+    const raw = await readRequestBody(req, { maxBytes: maxBodyBytes });
+    if (!raw) return undefined;
+    try { return JSON.parse(raw); }
+    catch { throw new HttpBodyError(400, 'Invalid JSON'); }
+  };
 
   const sendJson = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -1204,7 +1206,7 @@ async function startHttp(config: AppConfig): Promise<void> {
         let auth: { sub?: string; isWriter: boolean } | null = null;
         if (config.oauth) {
           const result = await validateBearer(req, config.oauth);
-          if (!result.ok) {
+          if (!result.ok || !result.sub) {
             sendUnauthorized(res, config.oauth);
             return;
           }
@@ -1227,12 +1229,14 @@ async function startHttp(config: AppConfig): Promise<void> {
         }
 
         if (sessionId && sessions.has(sessionId)) {
-          // Reject a valid token belonging to a different subject than the session was bound to.
-          const boundAuth = sessions.getAuth(sessionId);
-          if (config.oauth && boundAuth && auth?.sub !== boundAuth.sub) {
-            sendJson(res, 403, {
+          const authorization = config.oauth ? sessions.validateAuth(sessionId, auth) : 'ok';
+          if (authorization !== 'ok') {
+            const changed = authorization === 'permissions_changed';
+            sendJson(res, changed ? 404 : 403, {
               jsonrpc: "2.0",
-              error: { code: -32003, message: "Forbidden: token does not match session" },
+              error: { code: changed ? -32001 : -32003, message: changed
+                ? "Session permissions changed; reinitialize the session"
+                : "Forbidden: token does not match session" },
               id: null
             });
             return;
@@ -1312,6 +1316,15 @@ async function startHttp(config: AppConfig): Promise<void> {
 
       sendJson(res, 404, { error: "Not Found" });
     } catch (err) {
+      if (err instanceof HttpBodyError) {
+        if (req.aborted || res.headersSent) return;
+        res.setHeader('Connection', 'close');
+        sendJson(res, err.status, {
+          jsonrpc: '2.0', id: null,
+          error: { code: err.status === 400 ? -32700 : -32600, message: err.message }
+        });
+        return;
+      }
       logSafeError("HTTP handler error", err);
       if (!res.headersSent) {
         sendJson(res, 500, {

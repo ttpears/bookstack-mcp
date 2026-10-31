@@ -26,6 +26,7 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_report_hol.py'
 
       - name: Scan plugin locally
+        id: scan
         uses: hashgraph-online/ai-plugin-scanner-action@8c2dd4f9cc381ad56496ca44aab10ce19f6bdd0f # v1.2.813
         with:
           plugin_dir: '.'
@@ -42,6 +43,15 @@ jobs:
           upload_sarif: false
           submission_enabled: false
           pr_comment: 'off'
+
+      - name: Preserve scanner report
+        if: always() && steps.scan.outputs.report_path != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hol-scan-report
+          path: '${{ runner.temp }}/hol-guard-report.md'
+          retention-days: 14
+          if-no-files-found: warn
 
   report:
     name: Report trusted scan to HOL
@@ -61,6 +71,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan summary for HOL
+        id: summary
         uses: hashgraph-online/ai-plugin-scanner-action@8c2dd4f9cc381ad56496ca44aab10ce19f6bdd0f # v1.2.813
         with:
           plugin_dir: '.'
@@ -81,3 +92,12 @@ jobs:
         env:
           HOL_SCAN_REPORT: '${{ runner.temp }}/hol-registry-report.json'
         run: python3 scripts/report-hol.py "$HOL_SCAN_REPORT"
+
+      - name: Preserve registry scan summary
+        if: always() && steps.summary.outputs.report_path != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hol-registry-scan-summary
+          path: '${{ runner.temp }}/hol-registry-report.json'
+          retention-days: 14
+          if-no-files-found: warn

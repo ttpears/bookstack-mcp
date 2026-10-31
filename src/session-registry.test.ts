@@ -12,6 +12,26 @@ function fakeTransport() {
   return { transport, close };
 }
 
+test('OAuth role changes evict the old tool set; foreign identities cannot evict it', () => {
+  const sessions = new SessionRegistry();
+  try {
+    for (const isWriter of [true, false]) {
+      const { transport, close } = fakeTransport();
+      sessions.register('session', transport, { sub: 'owner', isWriter });
+      assert.equal(sessions.validateAuth('session', { sub: 'owner', isWriter }), 'ok');
+      assert.equal(sessions.validateAuth('session', { sub: 'other', isWriter: !isWriter }), 'forbidden');
+      assert.equal(sessions.validateAuth('session', { isWriter }), 'forbidden');
+      assert.equal(sessions.validateAuth('session', null), 'forbidden');
+      assert.equal(close.mock.callCount(), 0);
+      assert.equal(sessions.validateAuth('session', { sub: 'owner', isWriter: !isWriter }), 'permissions_changed');
+      assert.equal(close.mock.callCount(), 1);
+      assert.equal(sessions.has('session'), false, 'old credential and tool set must be unreachable');
+    }
+    sessions.register('unbound', fakeTransport().transport);
+    assert.equal(sessions.validateAuth('unbound', { sub: 'owner', isWriter: true }), 'forbidden');
+  } finally { sessions.dispose(); }
+});
+
 test('an abandoned session (onclose never fires) is swept after the idle TTL', (t) => {
   t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
 

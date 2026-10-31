@@ -252,6 +252,16 @@ the BookStack authorization token. Deleting an image can break existing page ref
 | `MCP_HTTP_HOST` | `127.0.0.1` | Bind address. Loopback by default for safety |
 | `MCP_HTTP_ALLOWED_HOSTS` | *(loopback only)* | Comma-separated allowlist of `Host` header hostnames for DNS rebinding protection. Required when binding to a non-loopback address |
 | `MCP_HTTP_PATH` | `/mcp` | Streamable HTTP endpoint |
+| `MCP_HTTP_MAX_BODY_BYTES` | `10485760` (10 MiB) | Maximum MCP JSON request size in bytes; positive integer |
+
+OAuth registration and token request bodies are limited to 64 KiB. Body reads
+must complete within 30 seconds. Oversized bodies return HTTP 413, slow bodies
+return 408, and malformed MCP JSON returns 400 without echoing its contents.
+
+OAuth sessions are bound to both the user's identity and current write role.
+If that role changes, the server closes the old session and returns 404 so the
+client reinitializes with the appropriate credential and tool set. OAuth pending
+states and authorization codes are consumed atomically, including with Redis.
 
 When binding to `0.0.0.0` (e.g. inside a container reachable from other services), set `MCP_HTTP_ALLOWED_HOSTS` to the hostnames LibreChat will use to reach this server, e.g. `MCP_HTTP_ALLOWED_HOSTS=bookstack-mcp,bookstack-mcp.internal`.
 
