@@ -1,7 +1,7 @@
 # BookStack MCP Server — runtime image
 # Built from the repo's source. Pushed to ghcr.io/ttpears/bookstack-mcp.
 
-FROM node:24-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 
 # --ignore-scripts: the package's `prepare` hook runs the build, but src/ isn't
@@ -15,7 +15,7 @@ RUN npm run build
 
 RUN npm prune --omit=dev --ignore-scripts
 
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 RUN apk add --no-cache dumb-init wget
 WORKDIR /app
 
