@@ -1,422 +1,103 @@
 # BookStack MCP Server
 
 [![npm version](https://img.shields.io/npm/v/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/bookstack-mcp)](https://www.npmjs.com/package/bookstack-mcp)
 [![CI](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ttpears/bookstack-mcp/actions/workflows/ci.yml)
 [![HOL trust score](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3Dttpears%252Fbookstack-mcp%26metric%3Dtrust%26style%3Dflat)](https://hol.org/registry/plugins/ttpears%2Fbookstack-mcp)
-[![Node.js](https://img.shields.io/node/v/bookstack-mcp)](https://nodejs.org)
-[![MCP](https://img.shields.io/badge/MCP-compatible-7DC9D6)](https://modelcontextprotocol.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<img src="assets/logo.svg" width="96" align="right" alt="bookstack-mcp"/>
+<img src="assets/logo.svg" width="96" align="right" alt="BookStack MCP"/>
 
-A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that gives AI assistants full access to your [BookStack](https://www.bookstackapp.com) documentation — search, read, create, and manage content.
+Connect an AI assistant to your [BookStack](https://www.bookstackapp.com) wiki through the [Model Context Protocol](https://modelcontextprotocol.io). Search documentation, answer questions with source links, summarize books, and optionally maintain pages and other content.
 
-```bash
-npx bookstack-mcp
-```
-
-Read the [privacy policy](./PRIVACY.md) for data flows, credentials, optional
-OAuth/Redis state, and logging. Your MCP client and deployment operator may have
-additional policies. The [terms of use](./TERMS.md) explain the scope of the
-software under its [MIT license](./LICENSE).
-
-Field notes: [Why my BookStack MCP server starts read-only](https://hackyourworld.com/bookstack-mcp-server-read-only-by-default/) covers the shared-token rate-limit failure, process-wide cache, response-size measurements, and permission boundaries that shaped the current design.
-
-## Features
-
-- 21 read-only tools + 22 write tools for BookStack API access
-- Books, chapters, pages, shelves, attachments, and comments — full CRUD
-- Recycle bin support — restore or permanently delete soft-deleted content
-- Type-safe input validation with Zod (auto-coerces string/number params for broad client compatibility)
-- Embedded URLs and content previews in all responses
-- Markdown export fallback for HTML-authored pages, so AI clients always get usable content
-- Token-efficient responses: compact JSON, no redundant fields, no N+1 fetches — ~30–55% smaller payloads than 3.x
-- Write operations disabled by default for safety
-- Works with Claude Desktop, Claude Code, LibreChat, and any MCP-compatible client
-- Stdio and Streamable HTTP transports
+**Read-only by default.** The server exposes 21 read tools and, when enabled, 22 write tools. BookStack permissions still apply to every API request. Use a dedicated account with access to only the content the assistant should see.
 
 ## Quick Start
 
-### Install from npm
+### 1. Create a BookStack API token
 
-```bash
-npx bookstack-mcp
-```
+In BookStack, open your profile's **API Tokens** section and create a token for a dedicated user. Its role needs **Access System API** and permission to view the relevant books/pages. Copy both the **Token ID** and **Token Secret**; they are separate values.
 
-### Or clone and build
+Also grant **Export Content** to read WYSIWYG pages as Markdown: BookStack stores no Markdown source for those pages, so the server uses its export endpoint as a fallback. User lookup and recycle-bin tools require additional administrative permissions; ordinary reading does not.
 
-```bash
-git clone https://github.com/ttpears/bookstack-mcp.git
-cd bookstack-mcp
-npm install && npm run build
-npm start
-```
+### 2. Choose an installation
 
-### Environment Variables
+| Your setup | Start here |
+|---|---|
+| Claude Desktop | Install the `.mcpb` bundle from the [latest release](https://github.com/ttpears/bookstack-mcp/releases/latest) under **Settings → Extensions**, then enter the three BookStack settings |
+| Claude Code | [Marketplace or direct CLI setup](docs/CLIENTS.md#claude-code) |
+| Codex or Gemini CLI | [Native plugin and extension setup](docs/CLIENTS.md#codex) |
+| Any local MCP client | Use the stdio configuration below |
+| LibreChat / shared Docker service | [Internal HTTP deployment](docs/SETUP.md#internal-http-service) |
+| Remote connector with Microsoft sign-in | [HTTPS and Entra OAuth deployment](docs/SETUP.md#public-connector-with-entra-oauth) |
 
-```env
-BOOKSTACK_BASE_URL=https://your-bookstack.com   # Required
-BOOKSTACK_TOKEN_ID=your-token-id                # Required
-BOOKSTACK_TOKEN_SECRET=your-token-secret        # Required
-BOOKSTACK_ENABLE_WRITE=false                    # Optional, default false
-BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=false        # Optional, default false
-BOOKSTACK_TIMEOUT_MS=30000                     # Optional, timeout per HTTP attempt
-BOOKSTACK_RETRY_TIMEOUT_MS=60000               # Optional, total budget per API request
-```
+For npm-based installations, use a supported Node.js LTS release (Node 24 recommended; CI also uses Node 22). The published package declares `node >=18`; that minimum is not a recommendation to run an unsupported Node release. Docker includes its own Node runtime.
 
-Each API request has a total budget covering concurrency queue time, HTTP attempts,
-and rate-limit backoff. HTTP 429 responses are retried up to five times, with each
-delay capped at 30 seconds. If a delay cannot fit in the remaining budget or retries
-are exhausted, the tool returns an explicit BookStack rate-limit error. The budget
-applies to each API request; tools that fetch multiple endpoints can take longer.
+### 3. Configure a local MCP client
 
-With write operations enabled, `update_page` and `update_chapter` accept `priority`
-as a non-negative integer (including numeric strings). Lower values sort first;
-use these tools to order pages and chapters within a book.
-
-`create_page` and `update_page` also accept an optional `changelog` message
-(1–180 characters), saved as the revision summary in the page's history. It
-needs BookStack v26.09 or newer; older versions silently ignore it.
-
-`create_page`, `update_page`, `create_book`, and `update_book` accept `tags`
-as an array of `{ "name": "Environment", "value": "Production" }` objects.
-Use `"value": ""` for a tag with no value. Chapter and shelf create/update
-tools also support tags.
-
-On updates, `tags` replaces the entire tag list: omit it to leave tags unchanged,
-or pass `[]` to remove all tags. To add, edit, or remove individual tags, first
-read the entity with `get_page` or `get_book`, then send the revised list,
-including every tag you want to keep. For example:
+Add this entry to your client's MCP configuration, replacing the example values:
 
 ```json
-{"id": 42, "tags": [{"name": "Environment", "value": "Production"}, {"name": "Reviewed", "value": ""}]}
+{
+  "mcpServers": {
+    "bookstack": {
+      "command": "npx",
+      "args": ["-y", "bookstack-mcp"],
+      "env": {
+        "BOOKSTACK_BASE_URL": "https://wiki.example.com",
+        "BOOKSTACK_TOKEN_ID": "your-token-id",
+        "BOOKSTACK_TOKEN_SECRET": "your-token-secret"
+      }
+    }
+  }
+}
 ```
 
-Pass this to `update_page` or `update_book`. A tag-only update needs no page
-content and preserves the editor source. Tag writes require
-`BOOKSTACK_ENABLE_WRITE=true` and the corresponding BookStack edit permission.
+This configuration contains credentials: keep it private and outside version control. For a reviewed, fixed version, replace `bookstack-mcp` with `bookstack-mcp@5.7.1`; otherwise npm resolves the current release when the client starts it.
 
-`get_page` accepts `format: "raw"` to return the page's stored editor HTML
-(BookStack's `raw_html`). The `html` format is the rendered view readers see:
-page includes are resolved and the content filter has run, so attributes such as
-`rel`, `data-*` or legacy `width`/`align` may be gone.
-
-When you edit a page, match the format to the page's `editor` field:
-
-- **HTML (WYSIWYG) pages:** read `format: "raw"` and send the result back as
-  `update_page.html`. Starting from `html` saves the rendered output and drops
-  whatever rendering removed.
-- **Markdown pages:** read `format: "markdown"` and send the result back as
-  `update_page.markdown`. For these pages `raw_html` is HTML generated from the
-  Markdown, and saving any `html` clears the stored Markdown source.
-
-> **Security warning:** `BOOKSTACK_INSECURE_SKIP_TLS_VERIFY=true` disables TLS certificate verification for outgoing requests to BookStack. Use only for self-signed certs on a trusted LAN — connections become vulnerable to MITM attacks. The server logs a `WARNING` line at startup whenever this is enabled.
+Restart the client, check that BookStack tools appear, and ask: **“List the books I can access, then find our onboarding guide and link to it.”** This verifies MCP connectivity and BookStack access. Starting `npx` without the required settings fails; starting it in a terminal with settings waits for MCP input rather than opening a web interface.
 
 ## Client Configuration
 
-### Codex plugin
+The [client guide](docs/CLIENTS.md) covers Claude Desktop, Claude Code, Codex, Gemini CLI, and LibreChat, including per-user HTTP credential headers. The [configuration reference](docs/CONFIGURATION.md) documents all server settings and the different npm and Docker defaults.
 
-This repository includes a native Codex manifest at
-`.codex-plugin/plugin.json`, which references the stdio server in `.mcp.json`.
-Set `BOOKSTACK_BASE_URL`, `BOOKSTACK_TOKEN_ID`, and `BOOKSTACK_TOKEN_SECRET` in
-the environment that launches Codex before enabling the plugin. Write operations
-remain disabled unless `BOOKSTACK_ENABLE_WRITE=true` is set.
-
-The manifest supplies the project website, privacy policy, and terms of use for
-plugin directories, including HOL. The HOL Guard CI workflow scans this manifest
-alongside the Claude and Gemini manifests. After a passing scan on `main`, a
-separate job sends an authenticated score summary to HOL so the registry can
-show the result checked in CI. PR scans remain read-only. See
-[HOL registry setup](docs/HOL.md) for ownership verification and reporting details.
-
-### Claude Desktop
-
-The easiest install is the prebuilt MCPB bundle attached to each [GitHub release](https://github.com/ttpears/bookstack-mcp/releases/latest):
-
-1. Download `bookstack-mcp-<version>.mcpb` from the latest release.
-2. Open Claude Desktop → **Settings → Extensions** and drag the `.mcpb` file in (or click *Install Extension*).
-3. Fill in **BookStack URL**, **API Token ID**, and **API Token Secret**. Tokens are stored in your OS keychain. Leave **Enable Write Operations** as `false` for read-only access; set to `true` to enable create/update/delete tools.
-
-#### Manual install (JSON config)
-
-If you'd rather edit the config file directly:
-
-```json
-{
-  "mcpServers": {
-    "bookstack": {
-      "command": "npx",
-      "args": ["-y", "bookstack-mcp"],
-      "env": {
-        "BOOKSTACK_BASE_URL": "https://your-bookstack.com",
-        "BOOKSTACK_TOKEN_ID": "your-token-id",
-        "BOOKSTACK_TOKEN_SECRET": "your-token-secret"
-      }
-    }
-  }
-}
-```
-
-### LibreChat (stdio, single-user)
-
-Add to your `librechat.yaml`:
-
-```yaml
-mcpServers:
-  bookstack:
-    command: npx
-    args:
-      - -y
-      - bookstack-mcp
-    env:
-      BOOKSTACK_BASE_URL: "https://your-bookstack.com"
-      BOOKSTACK_TOKEN_ID: "your-token-id"
-      BOOKSTACK_TOKEN_SECRET: "your-token-secret"
-```
-
-### LibreChat (Streamable HTTP, recommended for production / Docker)
-
-Run the server as a long-lived HTTP service and point LibreChat at the URL. This is the right setup for multi-user or containerized deployments.
-
-Start the server in HTTP mode:
-
-```bash
-MCP_TRANSPORT=http \
-MCP_HTTP_PORT=8080 \
-BOOKSTACK_BASE_URL=https://your-bookstack.com \
-BOOKSTACK_TOKEN_ID=your-token-id \
-BOOKSTACK_TOKEN_SECRET=your-token-secret \
-npx bookstack-mcp
-```
-
-Then configure LibreChat:
-
-```yaml
-mcpServers:
-  bookstack:
-    type: streamable-http
-    url: http://bookstack-mcp:8080/mcp
-```
-
-#### Per-user BookStack credentials
-
-Set `BOOKSTACK_ALLOW_REQUEST_CREDENTIALS=true` on the HTTP server to accept
-`X-Bookstack-Token-Id` and `X-Bookstack-Token-Secret` on each request. Both headers
-must be supplied together; when both are absent, the server uses its environment
-credentials. This is opt-in and does not change the write-tool or OAuth role gates.
-Use a read-only environment token with limited visibility for the fallback.
-Credential overrides apply to each request, including reused MCP sessions, and
-their slug caches are private to that request. Send credentials over HTTPS or a
-trusted internal connection and configure proxies to redact these headers.
-
-```yaml
-mcpServers:
-  bookstack:
-    type: streamable-http
-    url: http://bookstack-mcp:8080/mcp
-    headers:
-      X-Bookstack-Token-Id: "{{BOOKSTACK_TOKEN_ID}}"
-      X-Bookstack-Token-Secret: "{{BOOKSTACK_TOKEN_SECRET}}"
-    customUserVars:
-      BOOKSTACK_TOKEN_ID: { title: "BookStack token ID" }
-      BOOKSTACK_TOKEN_SECRET: { title: "BookStack token secret" }
-```
-
-#### Gallery images
-
-`list_images` lists images with optional `uploaded_to`, `offset`, `count`, and
-`sort` parameters. With write mode enabled, `create_image` accepts exactly one
-absolute `file_path` or HTTP(S) `url`, a required existing page ID `uploaded_to`,
-and an optional `name`. It uploads the binary data directly and returns BookStack's
-hosted URL, thumbnails, and `content.html` / `content.markdown` snippets. PNG,
-JPEG, GIF, WebP, and SVG sources up to 50 MB are supported; BookStack may impose
-smaller limits. `delete_image` deletes an image and its thumbnails by `id`.
-
-In stdio mode, files and HTTP(S) URLs are available to the trusted local client.
-In HTTP mode, local files are disabled unless
-`BOOKSTACK_ALLOW_LOCAL_IMAGE_FILES=true`. URL sources require a comma-separated
-`BOOKSTACK_IMAGE_ALLOWED_HOSTS` hostname allowlist, which also applies to every
-redirect. For example, allow your image service with
-`BOOKSTACK_IMAGE_ALLOWED_HOSTS=images.example.com`. Source downloads never use
-the BookStack authorization token. Deleting an image can break existing page references.
-
-> **3.0.0 breaking change:** the deprecated HTTP+SSE transport (`GET /sse` + `POST /messages`) has been removed. Streamable HTTP at `/mcp` already speaks SSE for streaming responses, and is the only HTTP transport in current MCP clients. If you're on an older client that needs the legacy endpoints, pin to `bookstack-mcp@2.x`.
-
-#### HTTP transport environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_TRANSPORT` | `stdio` | Set to `http` to enable the HTTP server |
-| `MCP_HTTP_PORT` | `8080` | Port to listen on |
-| `MCP_HTTP_HOST` | `127.0.0.1` | Bind address. Loopback by default for safety |
-| `MCP_HTTP_ALLOWED_HOSTS` | *(loopback only)* | Comma-separated allowlist of `Host` header hostnames for DNS rebinding protection. Required when binding to a non-loopback address |
-| `MCP_HTTP_PATH` | `/mcp` | Streamable HTTP endpoint |
-| `MCP_HTTP_MAX_BODY_BYTES` | `10485760` (10 MiB) | Maximum MCP JSON request size in bytes; positive integer |
-
-OAuth registration and token request bodies are limited to 64 KiB. Body reads
-must complete within 30 seconds. Oversized bodies return HTTP 413, slow bodies
-return 408, and malformed MCP JSON returns 400 without echoing its contents.
-
-OAuth sessions are bound to both the user's identity and current write role.
-If that role changes, the server closes the old session and returns 404 so the
-client reinitializes with the appropriate credential and tool set. OAuth pending
-states and authorization codes are consumed atomically, including with Redis.
-
-When binding to `0.0.0.0` (e.g. inside a container reachable from other services), set `MCP_HTTP_ALLOWED_HOSTS` to the hostnames LibreChat will use to reach this server, e.g. `MCP_HTTP_ALLOWED_HOSTS=bookstack-mcp,bookstack-mcp.internal`.
-
-Restart LibreChat after config changes.
-
-### Remote hosting & Claude Connector (Docker + Entra OAuth)
-
-A container image is published to `ghcr.io/ttpears/bookstack-mcp` (released `:X.Y.Z`/`:latest`,
-plus per-PR preview tags `:branch-<slug>`). The server can run as a public **Claude Connector**
-gated by Microsoft 365 / Entra ID login — users sign in, no API key or client credential to
-paste; write tools are unlocked per session by an Entra app role.
-
-See **[docs/SETUP.md](docs/SETUP.md)** for the full runbook: Entra app registration steps,
-the environment-variable reference, internal LibreChat deployment, and the public OAuth
-connector setup.
-
-### Claude Code (CLI)
-
-The recommended path is the `ttpears/claude-plugins` marketplace, which ships this repo's plugin manifest (`.claude-plugin/plugin.json`):
-
-```
-/plugin marketplace add ttpears/claude-plugins
-/plugin install bookstack-mcp@ttpears-plugins
-```
-
-Then set the `BOOKSTACK_*` environment variables in your shell so the plugin's MCP server can authenticate:
-
-```bash
-export BOOKSTACK_BASE_URL=https://your-bookstack.com
-export BOOKSTACK_TOKEN_ID=your-token-id
-export BOOKSTACK_TOKEN_SECRET=your-token-secret
-```
-
-#### Manual install (alternative)
-
-If you'd rather not use the marketplace, register the server directly with `claude mcp add`. Repeat `--env` for each variable, put all flags **before** the server name, and use `--` to mark the start of the command Claude Code will spawn:
-
-```bash
-claude mcp add bookstack \
-  --transport stdio \
-  --scope user \
-  --env BOOKSTACK_BASE_URL=https://your-bookstack.com \
-  --env BOOKSTACK_TOKEN_ID=your-token-id \
-  --env BOOKSTACK_TOKEN_SECRET=your-token-secret \
-  -- npx -y bookstack-mcp
-```
-
-Scope picks where the entry is written:
-
-| Scope | Where it lives | Shared via git | Use it when |
-|-------|----------------|----------------|-------------|
-| `local` (default) | `~/.claude.json`, scoped to the current project | No | Trying it out in one repo |
-| `user` | `~/.claude.json`, available in every project | No | You want bookstack everywhere |
-| `project` | `.mcp.json` at the repo root | Yes | The whole team should get it |
-
-The resulting config entry looks like this (in `.mcp.json` for project scope, or `~/.claude.json` otherwise):
-
-```json
-{
-  "mcpServers": {
-    "bookstack": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "bookstack-mcp"],
-      "env": {
-        "BOOKSTACK_BASE_URL": "https://your-bookstack.com",
-        "BOOKSTACK_TOKEN_ID": "your-token-id",
-        "BOOKSTACK_TOKEN_SECRET": "your-token-secret"
-      }
-    }
-  }
-}
-```
-
-> **Tip for committed `.mcp.json`:** Claude Code expands `${VAR}` and `${VAR:-default}` references in `.mcp.json` from the surrounding shell. Use that to keep secrets out of git: set `"BOOKSTACK_TOKEN_SECRET": "${BOOKSTACK_TOKEN_SECRET}"` in the file and have each developer export the variable in their shell.
-
-## MCP Resources
-
-Books and pages are also exposed as MCP resources, so clients that browse resources (Claude Desktop, MCP Inspector, etc.) can `@`-mention them directly:
-
-| URI template | Description |
-|--------------|-------------|
-| `bookstack://book/{id}` | A book, returned as JSON metadata |
-| `bookstack://page/{id}` | A page, returned as markdown plus a JSON metadata blob |
-
-Both templates support `id` autocompletion: as you type, the server searches BookStack and returns matching IDs so you don't have to remember numeric IDs by hand.
-
-> **4.0.0 breaking changes:** tool responses were trimmed for token efficiency. Removed fields: `direct_link`, `*_friendly` date strings, `content_info`, `contextual_info`, `change_summary`, `pagination_hint`, `location`, `summary`/`tags_summary`/`book_count` on shelves, and the buggy `page_url` on attachments. Use `url`, the ISO date fields, and `download_url` instead. The `get_capabilities` tool was removed — clients should use `tools/list` (built into MCP). Responses are now compact JSON (no pretty-printing) and `get_recent_changes` no longer issues per-result fetches.
+For development from a checkout, see [CONTRIBUTING.md](CONTRIBUTING.md). The server does not automatically read `.env`; use the client's `env` settings, export variables, or explicitly pass Node's `--env-file` option.
 
 ## Available Tools
 
-### Read Operations (always available)
+| Task | Tools and behavior |
+|---|---|
+| Find information | `search_content`, `search_pages`, `find_users`, `get_recent_changes` |
+| Read the wiki | List/detail tools for books, chapters, pages, shelves, attachments, and comments; `list_images` |
+| Export | `export_page`, `export_book`, `export_chapter` as HTML, Markdown, plaintext, PDF, or ZIP |
+| Maintain content | Optional create/update/delete tools, gallery image uploads, and recycle-bin operations |
 
-| Tool | Description |
-|------|-------------|
-| `search_content` | Search across all content with filtering |
-| `search_pages` | Search pages with optional book filtering |
-| `get_books` / `get_book` | List or get details of books |
-| `get_pages` / `get_page` | List or get full page content |
-| `get_chapters` / `get_chapter` | List or get chapter details |
-| `get_shelves` / `get_shelf` | List or get shelf details |
-| `get_attachments` / `get_attachment` | List or get attachment details |
-| `list_images` | List gallery images, optionally filtered by page |
-| `get_comments` / `get_comment` | List or get page comments (BookStack v25.11+) |
-| `find_users` | Look up BookStack users by name, email, or slug to resolve user slugs for `{created_by:X}`-style search filters |
-| `get_recycle_bin` | List items in the recycle bin |
-| `export_page` | Export page as HTML, PDF, Markdown, plaintext, or ZIP |
-| `export_book` | Export entire book |
-| `export_chapter` | Export chapter |
-| `get_recent_changes` | Recently updated content |
+See the [complete tool reference and recipes](docs/TOOLS.md) for all 43 tool names, pagination, tags, image policies, and version requirements. MCP `tools/list` on your connected server is authoritative for argument schemas and enabled tools.
 
-### Write Operations (requires `BOOKSTACK_ENABLE_WRITE=true`)
+To enable writes in **non-OAuth** mode, set `BOOKSTACK_ENABLE_WRITE=true` and use a BookStack token with the corresponding permissions. In OAuth mode, writes instead require the configured Entra role and a separate write-token pair. Entra users normally share those BookStack service accounts; sign-in does not automatically give each user their own BookStack identity or private content boundary.
 
-| Tool | Description |
-|------|-------------|
-| `create_book` / `update_book` / `delete_book` | Create, update, or delete a book |
-| `create_chapter` / `update_chapter` / `delete_chapter` | Create, update (including moving to a different book or reordering), or delete a chapter |
-| `create_page` | Create a new page (HTML or Markdown) |
-| `update_page` | Update content, rename, or move to a different book/chapter |
-| `delete_page` | Delete a page (recoverable from recycle bin) |
-| `create_shelf` / `update_shelf` / `delete_shelf` | Manage shelves |
-| `create_attachment` / `update_attachment` / `delete_attachment` | Manage attachments |
-| `create_image` / `delete_image` | Upload gallery images from files or URLs, or delete images |
-| `create_comment` / `update_comment` / `delete_comment` | Manage page comments (v25.11+) |
-| `restore_deleted` / `permanently_delete` | Restore or permanently destroy items in the recycle bin |
+### Editing pages safely
 
-## BookStack API Setup
+- For HTML/WYSIWYG pages, read `get_page` with `format: "raw"` and update using `html`. The rendered `html` view can remove editor attributes and resolve includes.
+- For Markdown pages, read `format: "markdown"` and update using `markdown`. Saving `html` clears the stored Markdown source.
+- Tags replace the entire tag list. Omit `tags` to preserve it, or send `[]` to clear it. Read the current list before changing individual tags.
+- Read all content chunks before replacing a large page. [Worked examples](docs/TOOLS.md#edit-without-losing-source-or-tags) show the workflow.
 
-1. Log into BookStack as an admin
-2. Go to **Settings > Users > Edit your user**
-3. Ensure the user has **Access System API** permission
-4. In the **API Tokens** section, create a new token
-5. Copy the Token ID and Token Secret
+## MCP Resources
 
-> **Also grant the role “Export Content”** if you read pages written in the
-> WYSIWYG editor. BookStack returns an empty `markdown` body for those pages, and
-> `get_page` recovers it from the server-side HTML→markdown export endpoint. Without
-> the permission that fallback fails and the page reads as empty. The default Viewer
-> role does not include it.
+Clients with resource support can browse `bookstack://book/{id}` for book metadata and `bookstack://page/{id}` for Markdown and page metadata. Both templates provide ID completion through BookStack search.
+
+Four MCP prompts guide read workflows: `answer_from_wiki`, `find_pages`, `summarize_book`, and `recent_changes`. [Prompt arguments](docs/TOOLS.md#resources-and-prompts) are documented alongside the tools. Client support for resources and prompts varies.
 
 ## Security
 
-- Write operations are **disabled by default**
-- Use HTTPS for production instances
-- Store API tokens securely (never commit to git)
-- Consider a dedicated BookStack user with limited permissions
+Use HTTPS, keep TLS verification enabled, and protect HTTP services with OAuth or a trusted internal network. HTTP without OAuth has no built-in caller authentication. Set an explicit allowed-host list when exposing a container; a host allowlist is not authentication.
 
-## Development
+HTTP image downloads require an allowed hostname, and local file uploads are disabled by default. Request bodies, request duration, and session counts are bounded. See [deployment boundaries](docs/CONFIGURATION.md#credentials-and-permissions) and the [security policy](SECURITY.md), including private vulnerability reporting.
 
-```bash
-npm run dev          # Hot reload with tsx
-npm run type-check   # Type checking only
-npm run build        # Production build
-```
+The [privacy policy](PRIVACY.md) explains data flows, credentials, OAuth/Redis state, and logging. Your AI client and deployment operator may have additional policies. Use is governed by the [terms](TERMS.md) and [MIT license](LICENSE).
 
-## License
+## Documentation
 
-MIT
+Browse the [documentation index](docs/README.md) for installation, deployment, configuration, tool recipes, troubleshooting, contributions, releases, and [HOL Guard](docs/HOL.md). For a connection problem, start with the [troubleshooting guide](docs/TROUBLESHOOTING.md).
+
+Design background: [Why my BookStack MCP server starts read-only](https://hackyourworld.com/bookstack-mcp-server-read-only-by-default/) describes permission boundaries, shared-token rate limiting, and response-size decisions.
