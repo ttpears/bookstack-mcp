@@ -84,6 +84,8 @@ if __name__ == "__main__":
     except Exception as error:
         # Upstream responses and token values must never reach job logs.
         detail = failure_detail(error)
+        if isinstance(error, HTTPError):
+            error.close()
         record_status(f"HOL CI report failed: {detail}; registry delivery is unconfirmed.", os.environ)
         print(f"::warning title=HOL registry reporting::Delivery not confirmed ({detail}).")
         sys.exit(1)

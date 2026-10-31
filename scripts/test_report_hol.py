@@ -19,6 +19,7 @@ class ReportingTests(unittest.TestCase):
     def test_delivery_summary_and_errors_exclude_response_bodies(self):
         failure = HTTPError('https://private.invalid', 403, 'private response details', {}, None)
         self.assertEqual(module.failure_detail(failure), 'HTTP 403')
+        failure.close()
         self.assertEqual(module.failure_detail(RuntimeError('private exception')), 'RuntimeError')
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'summary.md'
