@@ -30,9 +30,14 @@ scanner version, commit, workflow run, and scanned folder to HOL. It sends no
 source code, file contents, or finding text. Online probing, external analyzers,
 automatic catalog submissions, and PR comments remain disabled.
 
-Check the **Scan and report summary to HOL** step for a `sent` receipt and the
-number of listings updated. HOL reporting errors do not fail the scanner action,
-so a green job alone does not establish delivery. Retry a temporary delivery
+The v1.2.813 action advertises reporting but its packaged scanner 3.58.0 does not
+implement that input. A small repository script uses HOL's published OIDC
+contract to send only allowlisted summary fields and require a delivery receipt.
+It can be removed when a verified scanner release includes native reporting.
+
+Check **Report summary to HOL and verify receipt** for a `sent` receipt and the
+number of listings updated. Reporting failures fail the reporting job separately
+from the scan. Retry a temporary delivery
 failure by manually running the workflow on `main`; investigate persistent errors
 using the logged status, without adding long-lived credentials.
 
