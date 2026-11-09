@@ -4,7 +4,7 @@ Start with the [documentation index](docs/README.md) for user-facing behavior. U
 
 ## Development environment
 
-Use **Node 24 LTS** (recommended) or Node 22, npm, and Python 3 for the HOL reporting tests. CI uses Node 22; the Docker image uses Node 24. The test command needs Node's test-file glob support introduced in Node 21, so the package's runtime `engines` minimum is not sufficient for development.
+Use **Node 24 LTS** (recommended) or Node 22, npm, and Python 3 for the HOL reporting tests. CI uses Node 22; the Docker image uses Node 26 and runs the test suite during its build before pruning development dependencies. The test command needs Node's test-file glob support introduced in Node 21, so the package's runtime `engines` minimum is not sufficient for development.
 
 ```bash
 git clone https://github.com/ttpears/bookstack-mcp.git

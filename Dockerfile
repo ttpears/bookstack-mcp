@@ -13,6 +13,9 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
+# Validate the application on the same Node/Alpine runtime used in production.
+RUN npm test
+
 RUN npm prune --omit=dev --ignore-scripts
 
 FROM node:26-alpine AS runtime

@@ -46,7 +46,7 @@ Approval unblocks publishing; a tag alone is not publication. Keep the gate, tru
 |---|---|
 | npm `bookstack-mcp@X.Y.Z` | Node 22 and current npm CLI; `npm publish --access public --provenance` with GitHub OIDC trusted publishing |
 | GitHub release `vX.Y.Z` | Generated notes and `bookstack-mcp-X.Y.Z.mcpb` attachment |
-| GHCR container | Node 24; Linux amd64 and arm64; tags `X.Y.Z`, `X.Y`, `latest` |
+| GHCR container | Node 26; Linux amd64 and arm64; tags `X.Y.Z`, `X.Y`, `latest` |
 
 Publishing jobs run separately. Check every output rather than inferring success from one job. These commands inspect metadata without publishing; replace `X.Y.Z` first:
 
