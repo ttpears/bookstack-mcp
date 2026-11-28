@@ -17,7 +17,7 @@ Entra users do not automatically get their own BookStack permissions. Read the [
 
 ## Images and prerequisites
 
-Public release images are available at `ghcr.io/ttpears/bookstack-mcp` for Linux amd64 and arm64; ordinary public pulls do not need a GHCR token. Use a fixed release such as `:5.7.1` for reproducible deployment. `:5.7` and `:latest` move as releases are published. Pin an image digest when exact image identity is required.
+Public release images are available at `ghcr.io/ttpears/bookstack-mcp` for Linux amd64 and arm64; ordinary public pulls do not need a GHCR token. Use a fixed release such as `:5.7.2` for reproducible deployment. `:5.7` and `:latest` move as releases are published. Pin an image digest when exact image identity is required.
 
 Non-draft, same-repository PRs also publish amd64 preview images named `:branch-<sanitized-branch-name>`. Fork PRs build without publishing; drafts skip previews. Previews are for testing and do not publish npm packages.
 
@@ -37,7 +37,7 @@ Create `.env` with the three required BookStack values from [`.env.example`](../
 ```yaml
 services:
   bookstack-mcp:
-    image: ghcr.io/ttpears/bookstack-mcp:5.7.1
+    image: ghcr.io/ttpears/bookstack-mcp:5.7.2
     restart: unless-stopped
     environment:
       MCP_TRANSPORT: "http"
@@ -95,6 +95,25 @@ An administrator configures this once in the [Entra admin center](https://entra.
 
 Entra portal labels can vary. Validate with separate reader and writer accounts instead of treating a successful admin login as proof of correct assignments. Role changes become visible when the presented token's claims change; existing access tokens can retain old claims until refreshed or expired.
 
+### Allow an app-only caller (optional)
+
+Entra issues an app-only (client-credentials) token for this server's audience
+to any application in the tenant that asks, with no user, no MFA and no role
+unless one was assigned. The server refuses app-only tokens unless both
+settings below are set, so automation is admitted only on purpose:
+
+1. Under **App roles**, create an enabled role such as `Service.Read`, allowed
+   for **Applications**.
+2. In the calling application's **API permissions**, add that application
+   permission for this API and grant admin consent (or assign the role to the
+   caller's service principal).
+3. Set `OAUTH_SERVICE_ROLE` to the role value and `OAUTH_SERVICE_APP_IDS` to the
+   caller's client ID.
+
+App-only callers are read-only: write mode stays tied to a signed-in user with
+the write role. Prefer a certificate credential for the caller over a client
+secret.
+
 ### Configure the service and TLS proxy
 
 Add the OAuth values to your private `.env`. For this example, the proxy already uses an external Docker network named `edge` and routes `mcp.example.com` to `bookstack-mcp:8080`.
@@ -102,7 +121,7 @@ Add the OAuth values to your private `.env`. For this example, the proxy already
 ```yaml
 services:
   bookstack-mcp:
-    image: ghcr.io/ttpears/bookstack-mcp:5.7.1
+    image: ghcr.io/ttpears/bookstack-mcp:5.7.2
     restart: unless-stopped
     environment:
       MCP_TRANSPORT: "http"

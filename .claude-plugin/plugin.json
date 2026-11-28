@@ -1,7 +1,7 @@
 {
   "name": "bookstack-mcp",
   "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
-  "version": "5.7.1",
+  "version": "5.7.2",
   "author": {
     "name": "Tim Pearson"
   },
@@ -20,7 +20,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "bookstack-mcp@5.7.1"
+        "bookstack-mcp@5.7.2"
       ]
     }
   }

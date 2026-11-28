@@ -6,6 +6,7 @@ These notes explain selected releases. GitHub Releases has the full history and 
 
 | Version | Notes |
 |---|---|
+| [5.7.2](v5.7.2.md) | App-only Entra tokens need a service role (GHSA-pwpj-h98w-6ppx) |
 | [5.7.1](v5.7.1.md) | HTTP/OAuth hardening and single-use broker state |
 | [5.7.0](v5.7.0.md) | Page/book tags and editor-source preservation |
 | [5.6.1](v5.6.1.md) | Dependencies, native Codex metadata, and marketplace policies |

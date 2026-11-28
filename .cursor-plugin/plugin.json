@@ -1,6 +1,6 @@
 {
   "name": "bookstack-mcp",
-  "version": "5.7.1",
+  "version": "5.7.2",
   "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
   "author": {
     "name": "Tim Pearson"

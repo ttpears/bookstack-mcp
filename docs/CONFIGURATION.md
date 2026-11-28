@@ -87,6 +87,8 @@ These settings apply to the HTTP OAuth broker. Configure the matching Entra appl
 | `OAUTH_AUDIENCE` | `api://<client-id>` | Resource audience |
 | `OAUTH_SCOPES` | `openid profile offline_access <audience>/.default` | Upstream sign-in scopes |
 | `OAUTH_WRITE_ROLE` | `Writer` | Entra app-role value granting write mode |
+| `OAUTH_SERVICE_ROLE` | Unset: app-only tokens refused | Entra app-role value an app-only (client-credentials) caller must carry; such callers are read-only |
+| `OAUTH_SERVICE_APP_IDS` | Unset: app-only tokens refused | Comma-separated client IDs allowed to call with app-only tokens; needs `OAUTH_SERVICE_ROLE` too |
 | `BOOKSTACK_WRITE_TOKEN_ID` / `BOOKSTACK_WRITE_TOKEN_SECRET` | Unset | Optional separate write-capable BookStack token; both required |
 | `REDIS_URL` | Unset: in-memory | Redis connection URL for OAuth broker state |
 | `REDIS_KEY_PREFIX` | `bookstack-mcp` | Base prefix, additionally namespaced by issuer host |

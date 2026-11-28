@@ -12,7 +12,7 @@
 
 import { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID, createHash, randomBytes } from "node:crypto";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { KvStore, InMemoryKvStore, createStore } from "./kv-store.js";
 import { logSafeError, oauthErrorCode } from "../util/safe-errors.js";
 import { HttpBodyError, readRequestBody } from "../util/http-body.js";
@@ -25,6 +25,10 @@ export interface OAuthConfig {
   audience: string; // expected `aud` of the access token, e.g. api://<client-id>
   scopes: string; // space-separated scopes requested upstream from Entra
   writeRole: string; // Entra app-role value that grants write access
+  // App-only (client-credentials) callers: refused unless the token carries
+  // this app role and its client is listed. Empty role or list = refused.
+  serviceRole: string;
+  serviceAppIds: string[];
   trustProxy: boolean;
   // Derived Entra endpoints
   authorizeEndpoint: string;
@@ -38,6 +42,7 @@ export interface BearerResult {
   sub?: string;
   roles?: string[];
   isWriter?: boolean;
+  service?: boolean; // an app-only (client-credentials) caller
   error?: string;
 }
 
@@ -68,6 +73,9 @@ export function loadOAuthConfig(env: NodeJS.ProcessEnv): OAuthConfig | null {
   const scopes =
     env.OAUTH_SCOPES || `openid profile offline_access ${audience}/.default`;
   const writeRole = env.OAUTH_WRITE_ROLE || "Writer";
+  const serviceRole = env.OAUTH_SERVICE_ROLE || "";
+  const serviceAppIds = (env.OAUTH_SERVICE_APP_IDS || "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
   const trustProxy = env.MCP_TRUST_PROXY?.toLowerCase() === "true";
 
   const base = `https://login.microsoftonline.com/${tenantId}`;
@@ -79,6 +87,8 @@ export function loadOAuthConfig(env: NodeJS.ProcessEnv): OAuthConfig | null {
     audience,
     scopes,
     writeRole,
+    serviceRole,
+    serviceAppIds,
     trustProxy,
     authorizeEndpoint: `${base}/oauth2/v2.0/authorize`,
     tokenEndpoint: `${base}/oauth2/v2.0/token`,
@@ -184,9 +194,19 @@ function audienceMatches(cfg: OAuthConfig, aud: unknown): boolean {
   return false;
 }
 
+// A token with no delegated scope is app-only (client credentials): Entra
+// issues one to any app in the tenant that asks for this audience, with no
+// user, no MFA and no role unless one was assigned. v2 app tokens omit idtyp
+// unless that optional claim is configured, so the missing scp decides.
+function isAppOnly(payload: Record<string, unknown>): boolean {
+  if (payload.idtyp === "app") return true;
+  return typeof payload.scp !== "string" || payload.scp.trim() === "";
+}
+
 export async function validateBearer(
   req: IncomingMessage,
-  cfg: OAuthConfig
+  cfg: OAuthConfig,
+  keys: JWTVerifyGetKey = getJwks(cfg)
 ): Promise<BearerResult> {
   const header = req.headers["authorization"];
   if (!header || Array.isArray(header) || !header.startsWith("Bearer ")) {
@@ -194,7 +214,7 @@ export async function validateBearer(
   }
   const token = header.slice("Bearer ".length).trim();
   try {
-    const { payload } = await jwtVerify(token, getJwks(cfg), {
+    const { payload } = await jwtVerify(token, keys, {
       issuer: cfg.issuers,
     });
     if (!audienceMatches(cfg, payload.aud)) {
@@ -203,9 +223,22 @@ export async function validateBearer(
     const roles = Array.isArray(payload.roles)
       ? (payload.roles as string[])
       : [];
+    const sub = typeof payload.sub === "string" ? payload.sub : undefined;
+    if (isAppOnly(payload)) {
+      const appId = typeof payload.azp === "string" ? payload.azp
+        : typeof payload.appid === "string" ? payload.appid : "";
+      if (!cfg.serviceRole || !roles.includes(cfg.serviceRole)) {
+        return { ok: false, error: "app-only token without the service role" };
+      }
+      if (!appId || !cfg.serviceAppIds.includes(appId)) {
+        return { ok: false, error: "app-only token from an app that is not allowed" };
+      }
+      // A service caller reads only: write mode stays a user decision.
+      return { ok: true, sub, roles, isWriter: false, service: true };
+    }
     return {
       ok: true,
-      sub: typeof payload.sub === "string" ? payload.sub : undefined,
+      sub,
       roles,
       isWriter: roles.includes(cfg.writeRole),
     };

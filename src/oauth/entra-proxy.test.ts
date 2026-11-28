@@ -12,7 +12,7 @@ test('OAuth failures omit upstream bodies/descriptions and request values; succe
     serverUrl: 'https://mcp.example', tenantId: 'tenant', clientId: 'application',
     // Generated for the mocked identity endpoint, never a real credential.
     clientSecret: syntheticToken(), audience: 'audience', scopes: 'openid',
-    writeRole: 'Writer', trustProxy: false, authorizeEndpoint: 'https://identity.example/authorize',
+    writeRole: 'Writer', serviceRole: '', serviceAppIds: [], trustProxy: false, authorizeEndpoint: 'https://identity.example/authorize',
     tokenEndpoint: 'https://identity.example/token', issuers: [], jwksUri: 'https://identity.example/keys'
   };
   await initOAuthStore({}, cfg.serverUrl);
