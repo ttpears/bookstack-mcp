@@ -17,7 +17,7 @@ Entra users do not automatically get their own BookStack permissions. Read the [
 
 ## Images and prerequisites
 
-Public release images are available at `ghcr.io/ttpears/bookstack-mcp` for Linux amd64 and arm64; ordinary public pulls do not need a GHCR token. Use a fixed release such as `:5.7.2` for reproducible deployment. `:5.7` and `:latest` move as releases are published. Pin an image digest when exact image identity is required.
+Public release images are available at `ghcr.io/ttpears/bookstack-mcp` for Linux amd64 and arm64; ordinary public pulls do not need a GHCR token. Use a fixed release such as `:5.7.3` for reproducible deployment. `:5.7` and `:latest` move as releases are published. Pin an image digest when exact image identity is required.
 
 Non-draft, same-repository PRs also publish amd64 preview images named `:branch-<sanitized-branch-name>`. Fork PRs build without publishing; drafts skip previews. Previews are for testing and do not publish npm packages.
 
@@ -37,7 +37,7 @@ Create `.env` with the three required BookStack values from [`.env.example`](../
 ```yaml
 services:
   bookstack-mcp:
-    image: ghcr.io/ttpears/bookstack-mcp:5.7.2
+    image: ghcr.io/ttpears/bookstack-mcp:5.7.3
     restart: unless-stopped
     environment:
       MCP_TRANSPORT: "http"
@@ -121,7 +121,7 @@ Add the OAuth values to your private `.env`. For this example, the proxy already
 ```yaml
 services:
   bookstack-mcp:
-    image: ghcr.io/ttpears/bookstack-mcp:5.7.2
+    image: ghcr.io/ttpears/bookstack-mcp:5.7.3
     restart: unless-stopped
     environment:
       MCP_TRANSPORT: "http"

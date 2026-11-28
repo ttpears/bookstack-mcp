@@ -42,7 +42,7 @@ Add this entry to your client's MCP configuration, replacing the example values:
   "mcpServers": {
     "bookstack": {
       "command": "npx",
-      "args": ["-y", "bookstack-mcp@5.7.2"],
+      "args": ["-y", "bookstack-mcp@5.7.3"],
       "env": {
         "BOOKSTACK_BASE_URL": "https://wiki.example.com",
         "BOOKSTACK_TOKEN_ID": "your-token-id",
@@ -53,7 +53,7 @@ Add this entry to your client's MCP configuration, replacing the example values:
 }
 ```
 
-This configuration contains credentials: keep it private and outside version control. It pins the reviewed release `5.7.2`; update the exact version deliberately when upgrading. The repository's native plugin/extension launchers also pin a matching npm version.
+This configuration contains credentials: keep it private and outside version control. It pins the reviewed release `5.7.3`; update the exact version deliberately when upgrading. The repository's native plugin/extension launchers also pin a matching npm version.
 
 Restart the client, check that BookStack tools appear, and ask: **“List the books I can access, then find our onboarding guide and link to it.”** This verifies MCP connectivity and BookStack access. Starting `npx` without the required settings fails; starting it in a terminal with settings waits for MCP input rather than opening a web interface.
 

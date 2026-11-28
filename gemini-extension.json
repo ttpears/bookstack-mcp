@@ -1,6 +1,6 @@
 {
     "name": "bookstack-mcp",
-    "version": "5.7.2",
+    "version": "5.7.3",
     "description": "BookStack wiki MCP server — search, read, create, and manage documentation",
     "icon": "assets/logo.png",
     "mcpServers": {
@@ -8,7 +8,7 @@
             "command": "npx",
             "args": [
                 "-y",
-                "bookstack-mcp@5.7.2"
+                "bookstack-mcp@5.7.3"
             ]
         }
     },
