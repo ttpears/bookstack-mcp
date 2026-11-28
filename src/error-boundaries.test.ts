@@ -51,7 +51,8 @@ for (const mode of ['stdio', 'http'] as const) {
             MCP_HTTP_HOST: '127.0.0.1', MCP_HTTP_PORT: String(port), BOOKSTACK_IMAGE_ALLOWED_HOSTS: '127.0.0.1' } });
         child.stderr?.on('data', chunk => { logs += chunk.toString(); });
         let ready = false;
-        for (let retry = 0; retry < 150; retry++) {
+        // A deadline, not a retry count: tsx startup under arm64 emulation in the image build takes seconds
+        for (const deadline = Date.now() + 60_000; Date.now() < deadline;) {
           try { ready = (await fetch(`${host}/health`)).ok; } catch {}
           if (ready) break;
           await new Promise(resolve => setTimeout(resolve, 20));

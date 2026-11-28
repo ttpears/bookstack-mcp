@@ -39,7 +39,8 @@ test('HTTP session resolves each request identity with isolated caches and envir
   let id = 0;
   try {
     let ready = false;
-    for (let retry = 0; retry < 100; retry++) {
+    // A deadline, not a retry count: tsx startup under arm64 emulation in the image build takes seconds
+    for (const deadline = Date.now() + 60_000; Date.now() < deadline;) {
       try { ready = (await fetch(`${base}/health`)).ok; } catch {}
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 50));
